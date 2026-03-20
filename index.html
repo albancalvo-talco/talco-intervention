@@ -57,12 +57,50 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .chat-body{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;position:relative;}
 
 /* ── HISTORIQUE CONVERSATION ── */
+/* Feed conversation — rétractable */
+.conv-panel{
+  flex-shrink:0;
+  overflow:hidden;
+  max-height:0;
+  transition:max-height .4s cubic-bezier(.4,0,.2,1);
+  background:var(--bg);
+}
+.conv-panel.open{max-height:45vh;}
+
+.conv-toggle{
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px 8px 14px;
+  cursor:pointer;
+  border-bottom:1px solid var(--b0);
+  background:var(--s1);
+  user-select:none;
+  padding-right:100px;
+}
+.conv-toggle-left{display:flex;align-items:center;gap:8px;}
+.conv-toggle-label{
+  font-family:'DM Mono',monospace;font-size:9px;
+  color:var(--text2);letter-spacing:.12em;text-transform:uppercase;
+}
+.conv-toggle-count{
+  font-family:'DM Mono',monospace;font-size:9px;
+  color:var(--gold);background:rgba(232,169,0,.1);
+  border:1px solid rgba(232,169,0,.2);
+  border-radius:100px;padding:1px 6px;
+}
+.conv-toggle-arrow{
+  color:var(--text2);font-size:10px;
+  transition:transform .3s;flex-shrink:0;
+}
+.conv-panel.open ~ .conv-toggle .conv-toggle-arrow,
+.conv-toggle.open .conv-toggle-arrow{transform:rotate(180deg);}
+
 .conv-history{
-  flex:1;overflow-y:auto;
+  overflow-y:auto;
   padding:12px;
   padding-right:100px;
   display:flex;flex-direction:column;gap:8px;
-  min-height:0;
+  max-height:45vh;
 }
 .conv-history::-webkit-scrollbar{width:3px;}
 .conv-history::-webkit-scrollbar-track{background:transparent;}
@@ -201,23 +239,57 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .orb-status.speaking{color:var(--gold);}
 .orb-status.processing{color:var(--warn);}
 
-/* Bouton micro principal */
-.btn-mic-main{
-  width:68px;height:68px;border-radius:50%;
-  background:var(--gold);color:#111;
-  border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  transition:all .2s;
-  box-shadow:0 0 0 8px rgba(232,169,0,.1);
+/* Orbe cliquable — micro intégré */
+.orb-wrap{cursor:pointer;}
+.orb-wrap:active{transform:scale(.96);}
+.orb-wrap.listening .orb-bg{animation-duration:1.3s !important;}
+
+/* Icône micro fondue dans l'orbe */
+.orb-mic-icon{
+  position:absolute;
+  bottom:8px;right:8px;
+  width:22px;height:22px;
+  opacity:0.35;
+  transition:opacity .3s;
+  pointer-events:none;
+  z-index:10;
 }
-.btn-mic-main svg{width:26px;height:26px;}
-.btn-mic-main.listening{
-  background:var(--danger);
-  box-shadow:0 0 0 8px rgba(224,82,82,.12);
-  animation:mic-ring 1.1s ease-out infinite;
+.orb-wrap:hover .orb-mic-icon{opacity:0.6;}
+.orb-wrap.listening .orb-mic-icon{opacity:0;}
+
+/* Ring listening sur l'orbe */
+.orb-wrap.listening{
+  animation:orb-ring 1.2s ease-out infinite;
 }
-.btn-mic-main:active{transform:scale(.94);}
-@keyframes mic-ring{0%{box-shadow:0 0 0 0 rgba(224,82,82,.5);}70%{box-shadow:0 0 0 20px rgba(224,82,82,0);}100%{box-shadow:0 0 0 0 rgba(224,82,82,0);}}
+@keyframes orb-ring{
+  0%{box-shadow:0 0 0 0 rgba(224,82,82,.5);}
+  70%{box-shadow:0 0 0 24px rgba(224,82,82,0);}
+  100%{box-shadow:0 0 0 0 rgba(224,82,82,0);}
+}
+border-radius:50%;
+
+/* Toggle mode conversation continue */
+.mode-toggle{
+  display:flex;align-items:center;gap:8px;
+  margin-top:12px;
+  font-family:'DM Mono',monospace;font-size:9px;
+  color:var(--text2);letter-spacing:.1em;text-transform:uppercase;
+  cursor:pointer;user-select:none;
+}
+.mode-toggle-track{
+  width:28px;height:16px;border-radius:8px;
+  background:var(--s3);border:1px solid var(--b2);
+  position:relative;transition:background .2s;flex-shrink:0;
+}
+.mode-toggle-track.on{background:rgba(232,169,0,.3);border-color:rgba(232,169,0,.4);}
+.mode-toggle-thumb{
+  position:absolute;top:2px;left:2px;
+  width:10px;height:10px;border-radius:50%;
+  background:var(--text2);transition:all .2s;
+}
+.mode-toggle-track.on .mode-toggle-thumb{
+  left:14px;background:var(--gold);
+}
 
 /* TOAST */
 .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--s3);border:1px solid var(--b2);border-radius:100px;padding:10px 20px;font-size:12px;color:var(--text);white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none;z-index:300;}
@@ -272,20 +344,36 @@ const LOGO_B64="/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoH
 
   <div class="chat-body">
 
-    <!-- Historique conversation -->
-    <div class="conv-history" id="conv-history"></div>
+    <!-- Toggle conversation -->
+    <div class="conv-toggle" id="conv-toggle" onclick="toggleConvPanel()">
+      <div class="conv-toggle-left">
+        <span class="conv-toggle-label">Conversation</span>
+        <span class="conv-toggle-count" id="conv-count">0</span>
+      </div>
+      <span class="conv-toggle-arrow">▼</span>
+    </div>
+
+    <!-- Historique conversation — rétractable -->
+    <div class="conv-panel" id="conv-panel">
+      <div class="conv-history" id="conv-history"></div>
+    </div>
 
     <!-- Recap champs collectés -->
     <div class="fields-recap" id="fields-recap"></div>
 
-    <!-- Zone micro + orbe -->
+    <!-- Zone micro + orbe — l'orbe EST le bouton -->
     <div class="mic-zone">
-      <div class="orb-wrap">
+      <div class="orb-wrap" id="orb-wrap" onclick="handleOrbClick()">
         <div class="orb-layer orb-bg" id="orb-bg"></div>
         <div class="orb-layer orb-mid"></div>
         <div class="orb-layer orb-core"></div>
         <div class="orb-layer orb-shine"></div>
         <div class="sending-indicator" id="sending-indicator"></div>
+        <!-- Icône micro minimaliste fondue dans l'orbe -->
+        <svg class="orb-mic-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+        </svg>
       </div>
       <div class="orb-wave" id="orb-wave">
         <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
@@ -294,12 +382,13 @@ const LOGO_B64="/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoH
         <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
       </div>
       <div class="orb-status" id="orb-status">Appuie pour parler</div>
-      <button class="btn-mic-main" id="btn-mic" onclick="toggleMic()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
-        </svg>
-      </button>
+      <!-- Toggle mode conversation continue -->
+      <div class="mode-toggle" onclick="toggleContinuousMode()">
+        <div class="mode-toggle-track" id="mode-track">
+          <div class="mode-toggle-thumb"></div>
+        </div>
+        <span id="mode-label">Mode continu</span>
+      </div>
     </div>
 
   </div>
@@ -420,20 +509,47 @@ function startSession(){
 function newSession(){
   state.session_id=`session_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
   state.history=[];state.responses={};state.is_complete=false;
+  convCount=0;
   document.getElementById('conv-history').innerHTML='';
+  const countEl=document.getElementById('conv-count');
+  if(countEl) countEl.textContent='0';
+  // Fermer le panel
+  document.getElementById('conv-panel')?.classList.remove('open');
+  document.getElementById('conv-toggle')?.classList.remove('open');
   updateFieldsRecap();
   sendToAgent(null,'__init__');
 }
 
 // ══ MICRO ══
-async function toggleMic(){
-  if(state.isProcessing)return;
-  unlockAudio(); // Débloquer l'audio au premier clic utilisateur
+// Mode conversation continue
+let continuousMode = false;
+
+function toggleContinuousMode(){
+  continuousMode = !continuousMode;
+  const track = document.getElementById('mode-track');
+  const label = document.getElementById('mode-label');
+  track.className = 'mode-toggle-track' + (continuousMode ? ' on' : '');
+  label.textContent = continuousMode ? 'Continu actif' : 'Mode continu';
+  if(continuousMode){
+    showToast('Mode continu — parle librement');
+    if(!state.isListening && !state.isProcessing) startRecording();
+  }
+}
+
+// Clic sur l'orbe = toggle micro
+async function handleOrbClick(){
+  if(state.isProcessing) return;
+  unlockAudio();
   if(state.isListening){
     stopRecording();
   } else {
     await startRecording();
   }
+}
+
+// Garder toggleMic pour compatibilité
+async function toggleMic(){
+  await handleOrbClick();
 }
 
 async function startRecording(){
@@ -451,7 +567,7 @@ async function startRecording(){
     state.mediaRecorder.start();
     state.isListening=true;
     setOrbState('listening');
-    document.getElementById('btn-mic').classList.add('listening');
+    document.getElementById('orb-wrap').classList.add('listening');
     document.getElementById('orb-status').textContent='Écoute en cours...';
     document.getElementById('orb-status').className='orb-status listening';
   }catch(e){
@@ -463,7 +579,7 @@ function stopRecording(){
   if(state.mediaRecorder&&state.isListening){
     state.mediaRecorder.stop();
     state.isListening=false;
-    document.getElementById('btn-mic').classList.remove('listening');
+    document.getElementById('orb-wrap').classList.remove('listening');
     setOrbState('processing');
     document.getElementById('orb-status').textContent='Traitement...';
     document.getElementById('orb-status').className='orb-status processing';
@@ -533,13 +649,18 @@ async function sendToAgent(audioBase64, textInput){
       await playAudio(data.audio_base64);
     }
 
+    // Mode continu — relancer l'écoute automatiquement après la réponse
+    if(continuousMode && !state.is_complete){
+      setTimeout(()=> startRecording(), 500);
+    }
+
     // Session terminée
     if(state.is_complete){
       setOrbState('idle');
       document.getElementById('orb-status').textContent='Rapport complet ✓';
       document.getElementById('orb-status').className='orb-status';
-      document.getElementById('btn-mic').style.opacity='.4';
-      document.getElementById('btn-mic').style.pointerEvents='none';
+      document.getElementById('orb-wrap').style.opacity='.4';
+      document.getElementById('orb-wrap').style.pointerEvents='none';
     }
 
   }catch(e){
@@ -606,6 +727,16 @@ async function playAudio(base64){
 
 
 // ══ UI ══
+let convCount = 0;
+
+function toggleConvPanel(){
+  const panel = document.getElementById('conv-panel');
+  const toggle = document.getElementById('conv-toggle');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
 function addBubble(role,text){
   const hist=document.getElementById('conv-history');
   const div=document.createElement('div');
@@ -614,6 +745,17 @@ function addBubble(role,text){
   div.innerHTML=`<div class="bubble-label">${label}</div>${escHtml(text)}`;
   hist.appendChild(div);
   hist.scrollTop=hist.scrollHeight;
+  // Mettre à jour le compteur et ouvrir si panel fermé
+  convCount++;
+  const countEl=document.getElementById('conv-count');
+  if(countEl) countEl.textContent=convCount;
+  // Ouvrir automatiquement au premier message
+  if(convCount===1){
+    const panel=document.getElementById('conv-panel');
+    const toggle=document.getElementById('conv-toggle');
+    panel.classList.add('open');
+    toggle.classList.add('open');
+  }
 }
 
 function addTyping(id){
