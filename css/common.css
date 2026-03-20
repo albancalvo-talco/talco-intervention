@@ -1,0 +1,47 @@
+:root{
+  --gold:#E8A900;--gold-dim:#9e7200;
+  --bg:#0e0e0e;--s1:#181818;--s2:#222;--s3:#2c2c2c;
+  --b0:rgba(255,255,255,0.05);--b1:rgba(255,255,255,0.09);--b2:rgba(255,255,255,0.14);
+  --text:#EEEAE4;--text2:#6a6860;
+  --danger:#e05252;--success:#4ecb7a;--warn:#f5a623;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+.screen{display:none;flex-direction:column;height:100dvh;overflow:hidden;}
+.screen.active{display:flex;}
+
+/* LOGIN */
+#screen-login{align-items:center;justify-content:center;padding:2rem 1.5rem;gap:0;position:relative;overflow:hidden;}
+#screen-login::before{content:'';position:absolute;inset:0;background-image:radial-gradient(rgba(232,169,0,.09) 1px,transparent 1px);background-size:30px 30px;pointer-events:none;}
+.login-logo-wrap{background:#fff;border-radius:12px;padding:12px 18px;margin-bottom:2rem;display:inline-block;box-shadow:0 0 0 1px rgba(232,169,0,.2),0 8px 40px rgba(0,0,0,.6);position:relative;z-index:1;}
+.login-logo-wrap img{width:110px;display:block;}
+.login-divider{width:36px;height:3px;background:var(--gold);border-radius:2px;margin:0 auto 1.8rem;position:relative;z-index:1;}
+.login-title{font-family:'Syne',sans-serif;font-size:clamp(1.8rem,8vw,2.6rem);font-weight:800;text-align:center;line-height:1.1;margin-bottom:.4rem;letter-spacing:-.02em;position:relative;z-index:1;}
+.login-title span{color:var(--gold);}
+.login-sub{font-size:13px;color:var(--text2);text-align:center;margin-bottom:2.6rem;position:relative;z-index:1;}
+.btn-google{display:flex;align-items:center;gap:12px;background:var(--s2);border:1px solid var(--b2);color:var(--text);padding:15px 28px;border-radius:100px;font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;width:100%;max-width:300px;justify-content:center;position:relative;z-index:1;}
+.btn-google:active{transform:scale(.97);border-color:var(--gold);}
+.btn-google svg{width:20px;height:20px;flex-shrink:0;}
+.login-note{margin-top:1.2rem;font-size:11px;color:var(--text2);text-align:center;position:relative;z-index:1;}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;background:var(--s1);border-bottom:1px solid var(--b0);position:relative;flex-shrink:0;}
+.header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.55;}
+.header-logo-wrap{background:#fff;border-radius:6px;padding:4px 7px;}
+.header-logo-wrap img{width:58px;display:block;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.header-user{display:flex;align-items:center;gap:7px;font-family:'Syne',sans-serif;font-size:12px;font-weight:600;}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--gold);color:#111;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+
+/* TOAST */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--s3);border:1px solid var(--b2);border-radius:100px;padding:10px 20px;font-size:12px;color:var(--text);white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none;z-index:300;}
+.toast.visible{opacity:1;}
+
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:rgba(14,14,14,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2rem;z-index:400;opacity:0;pointer-events:none;transition:opacity .3s;}
+.loading-overlay.visible{opacity:1;pointer-events:all;}
+.spinner{width:40px;height:40px;border:2px solid var(--b2);border-top-color:var(--gold);border-radius:50%;animation:spin .75s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-steps{display:flex;flex-direction:column;gap:7px;align-items:center;}
+.loading-step{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);letter-spacing:.08em;transition:color .3s;}
+.loading-step.active{color:var(--gold);}.loading-step.done{color:var(--success);}
