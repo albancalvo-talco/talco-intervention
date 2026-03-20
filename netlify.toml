@@ -1,0 +1,22 @@
+# Proxy n8n — contourne le CORS entièrement
+# Les appels /api/* sont redirigés vers n8n côté serveur (pas de preflight)
+
+[[redirects]]
+  from = "/api/voice-chat"
+  to = "https://n8n.talco-lr.com/webhook/talco-voice-chat"
+  status = 200
+  force = true
+  [redirects.headers]
+    X-Forwarded-Host = "talco-intervention.netlify.app"
+
+[[redirects]]
+  from = "/api/normalize"
+  to = "https://n8n.talco-lr.com/webhook/talco-intervention-normalize"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/pwa"
+  to = "https://n8n.talco-lr.com/webhook/talco-intervention-pwa"
+  status = 200
+  force = true
