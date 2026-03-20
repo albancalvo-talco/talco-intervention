@@ -187,8 +187,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
   background:var(--bg);
   border-top:1px solid rgba(232,169,0,.12);
   border-radius:22px 22px 0 0;
-  padding:16px 16px 28px;
-  padding-right:100px;
+  padding:16px 16px 14px;
   display:flex;flex-direction:column;align-items:center;gap:0;
 }
 
@@ -233,7 +232,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .orb-status{
   font-family:'DM Mono',monospace;font-size:9px;
   color:var(--text2);letter-spacing:.12em;text-transform:uppercase;
-  margin-bottom:14px;min-height:14px;text-align:center;
+  margin-bottom:10px;min-height:14px;text-align:center;
 }
 .orb-status.listening{color:var(--danger);}
 .orb-status.speaking{color:var(--gold);}
@@ -268,27 +267,38 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 }
 border-radius:50%;
 
-/* Toggle mode conversation continue */
-.mode-toggle{
-  display:flex;align-items:center;gap:8px;
-  margin-top:12px;
-  font-family:'DM Mono',monospace;font-size:9px;
-  color:var(--text2);letter-spacing:.1em;text-transform:uppercase;
+/* Barre mode continu — collée en bas, grande zone tactile */
+.mode-bar{
+  width:100%;
+  background:var(--s1);
+  border-top:1px solid var(--b0);
+  padding:12px 20px 20px;
+  display:flex;align-items:center;justify-content:center;gap:12px;
   cursor:pointer;user-select:none;
+  flex-shrink:0;
 }
+.mode-bar-label{
+  font-family:'DM Mono',monospace;font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;
+  transition:color .2s;
+}
+.mode-bar.on .mode-bar-label{color:var(--gold);}
+.mode-bar:not(.on) .mode-bar-label{color:var(--text2);}
 .mode-toggle-track{
-  width:28px;height:16px;border-radius:8px;
+  width:40px;height:22px;border-radius:11px;
   background:var(--s3);border:1px solid var(--b2);
-  position:relative;transition:background .2s;flex-shrink:0;
+  position:relative;transition:all .2s;flex-shrink:0;
 }
-.mode-toggle-track.on{background:rgba(232,169,0,.3);border-color:rgba(232,169,0,.4);}
+.mode-bar.on .mode-toggle-track{
+  background:rgba(232,169,0,.25);border-color:rgba(232,169,0,.45);
+}
 .mode-toggle-thumb{
-  position:absolute;top:2px;left:2px;
-  width:10px;height:10px;border-radius:50%;
-  background:var(--text2);transition:all .2s;
+  position:absolute;top:3px;left:3px;
+  width:14px;height:14px;border-radius:50%;
+  background:var(--text2);transition:all .25s cubic-bezier(.4,0,.2,1);
 }
-.mode-toggle-track.on .mode-toggle-thumb{
-  left:14px;background:var(--gold);
+.mode-bar.on .mode-toggle-thumb{
+  left:21px;background:var(--gold);
 }
 
 /* TOAST */
@@ -382,13 +392,13 @@ const LOGO_B64="/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoH
         <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
       </div>
       <div class="orb-status" id="orb-status">Appuie pour parler</div>
-      <!-- Toggle mode conversation continue -->
-      <div class="mode-toggle" onclick="toggleContinuousMode()">
-        <div class="mode-toggle-track" id="mode-track">
-          <div class="mode-toggle-thumb"></div>
-        </div>
-        <span id="mode-label">Mode continu</span>
+    </div>
+    <!-- Barre mode continu — bas de page, zone tactile large -->
+    <div class="mode-bar on" id="mode-bar" onclick="toggleContinuousMode()">
+      <div class="mode-toggle-track" id="mode-track">
+        <div class="mode-toggle-thumb"></div>
       </div>
+      <span class="mode-bar-label" id="mode-label">Continu activé</span>
     </div>
 
   </div>
@@ -521,18 +531,20 @@ function newSession(){
 }
 
 // ══ MICRO ══
-// Mode conversation continue
-let continuousMode = false;
+// Mode conversation continue — activé par défaut
+let continuousMode = true;
 
 function toggleContinuousMode(){
   continuousMode = !continuousMode;
-  const track = document.getElementById('mode-track');
+  const bar  = document.getElementById('mode-bar');
   const label = document.getElementById('mode-label');
-  track.className = 'mode-toggle-track' + (continuousMode ? ' on' : '');
-  label.textContent = continuousMode ? 'Continu actif' : 'Mode continu';
+  bar.className = 'mode-bar' + (continuousMode ? ' on' : '');
+  label.textContent = continuousMode ? 'Continu activé' : 'Mode continu';
   if(continuousMode){
-    showToast('Mode continu — parle librement');
+    showToast('Mode continu activé');
     if(!state.isListening && !state.isProcessing) startRecording();
+  } else {
+    showToast('Mode continu désactivé');
   }
 }
 
