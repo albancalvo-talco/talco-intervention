@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#0e0e0e">
+<title>TALCO LR — Rapport d'Intervention</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/pwa.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login" class="screen active">
+  <div class="login-logo-wrap"><img class="logo-img" alt="TALCO LR"></div>
+  <div class="login-divider"></div>
+  <h1 class="login-title">Rapport<br>d'<span>intervention</span></h1>
+  <p class="login-sub">Connexion avec votre compte Talco LR</p>
+  <div id="g_id_onload"
+    data-client_id="303849110460-10rqg6oco2jseasj4ccsh1n0e4btulea.apps.googleusercontent.com"
+    data-callback="handleGoogleCredential"
+    data-auto_prompt="false">
+  </div>
+  <div class="g_id_signin"
+    data-type="standard" data-shape="pill" data-theme="filled_black"
+    data-text="signin_with" data-size="large" data-locale="fr" data-width="280">
+  </div>
+  <button class="btn-google" id="btn-fallback" onclick="loginFallback()" style="display:none">
+    <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+    Se connecter avec Google
+  </button>
+  <p class="login-note">Réservé aux comptes @talco-lr.com</p>
+  <div id="login-error" style="display:none;margin-top:1rem;padding:10px 16px;background:rgba(224,82,82,.1);border:1px solid var(--danger);border-radius:10px;font-size:12px;color:var(--danger);text-align:center;max-width:300px;">
+    ⚠ Compte non autorisé — utilise ton adresse @talco-lr.com
+  </div>
+</div>
+
+<!-- RAPPORT -->
+<div id="screen-rapport" class="screen">
+  <div class="header">
+    <div class="header-logo-wrap"><img class="logo-img" alt="TALCO LR"></div>
+    <div class="header-user">
+      <div class="avatar" id="user-avatar">T</div>
+      <span id="user-name">Tech</span>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    <span class="progress-label" id="progress-label">1 / 16</span>
+  </div>
+
+  <div class="rapport-body">
+    <div class="history-zone" id="history-zone"></div>
+    <div class="zone-separator hidden" id="zone-sep"></div>
+
+    <div class="active-zone">
+      <div class="tile-active" id="tile-active">
+        <div class="tile-cat" id="tile-cat">identification</div>
+        <div class="tile-question" id="tile-question">Chargement...</div>
+        <div class="tile-hint" id="tile-hint"></div>
+        <div class="tile-answer-box" id="tile-answer-box">
+          <span class="tile-answer-placeholder" id="tile-answer-ph">Appuie sur le micro pour répondre...</span>
+        </div>
+        <div id="tile-norm"></div>
+        <div class="tile-photos-content" id="tile-photos-content">
+          <div class="photos-hdr">
+            <span class="photos-title">Photos du chantier</span>
+            <span class="photos-counter" id="photos-counter">0 / 5</span>
+          </div>
+          <div class="photos-grid" id="photos-grid">
+            <label class="photo-add" for="file-input" id="photo-add-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span class="photo-add-label">Ajouter</span>
+            </label>
+          </div>
+          <div class="photo-dots">
+            <div class="photo-dot" id="pdot-0"></div><div class="photo-dot" id="pdot-1"></div>
+            <div class="photo-dot" id="pdot-2"></div><div class="photo-dot" id="pdot-3"></div>
+            <div class="photo-dot" id="pdot-4"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="orb-panel" id="orb-panel">
+        <div class="orb-handle"></div>
+        <div class="orb-q-label" id="orb-q-label"></div>
+        <div class="orb-wrap">
+          <div class="orb-layer orb-bg" id="orb-bg"></div>
+          <div class="orb-layer orb-mid"></div>
+          <div class="orb-layer orb-core"></div>
+          <div class="orb-layer orb-shine"></div>
+        </div>
+        <div class="orb-wave" id="orb-wave">
+          <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
+          <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
+          <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
+          <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
+          <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
+        </div>
+        <div class="orb-text" id="orb-text"><span class="ph">Appuie sur le micro...</span></div>
+        <div class="orb-norm" id="orb-norm"></div>
+        <div class="orb-btns">
+          <button class="orb-btn" id="orb-reprendre" onclick="annulerConfirmation()" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+          </button>
+          <button class="orb-btn mic" id="orb-mic" onclick="toggleMic()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+          </button>
+          <button class="orb-btn valid" id="orb-valid" onclick="confirmerAction()" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          </button>
+          <button class="orb-btn skip" onclick="skipQuestion()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar" id="bottom-bar">
+    <button class="btn-terminer" onclick="terminerPhotos()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+      Terminer le rapport
+    </button>
+  </div>
+</div>
+
+<!-- CONFIRMATION -->
+<div id="screen-confirmation" class="screen">
+  <div class="confirm-icon">✓</div>
+  <div class="confirm-title">Rapport envoyé !</div>
+  <div class="confirm-recap" id="confirm-recap">Chargement...</div>
+  <button class="btn-nouveau" onclick="nouveauRapport()">+ Nouveau rapport</button>
+  <div class="confirm-footer">TALCO LR — 40 rue Pinville, 34000 Montpellier — www.talco-lr.com</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-steps">
+    <div class="loading-step" id="lstep-1">Préparation des données...</div>
+    <div class="loading-step" id="lstep-2">Upload des photos...</div>
+    <div class="loading-step" id="lstep-3">Enregistrement du rapport...</div>
+  </div>
+</div>
+<input type="file" id="file-input" accept="image/*" capture="environment" multiple onchange="handlePhotos(this)">
+
+<script src="js/common.js"></script>
+<script src="js/pwa.js"></script>
+</body>
+</html>
