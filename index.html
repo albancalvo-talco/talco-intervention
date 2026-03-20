@@ -428,6 +428,7 @@ function newSession(){
 // ══ MICRO ══
 async function toggleMic(){
   if(state.isProcessing)return;
+  unlockAudio(); // Débloquer l'audio au premier clic utilisateur
   if(state.isListening){
     stopRecording();
   } else {
@@ -548,8 +549,7 @@ async function sendToAgent(audioBase64, textInput){
   }finally{
     state.isProcessing=false;
     document.getElementById('sending-indicator').classList.remove('visible');
-    // Ne réinitialise l'orbe que si pas d'audio en attente ou en lecture
-    if(!state.is_complete && !window._pendingAudio && !state.currentAudio){
+    if(!state.is_complete && !state.currentAudio){
       setOrbState('idle');
       document.getElementById('orb-status').textContent='Appuie pour parler';
       document.getElementById('orb-status').className='orb-status';
@@ -558,50 +558,50 @@ async function sendToAgent(audioBase64, textInput){
 }
 
 // ══ AUDIO TTS ══
+// AudioContext débloqué au premier clic utilisateur
+let audioCtx = null;
+
+function unlockAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+
 async function playAudio(base64){
-  return new Promise((resolve)=>{
+  return new Promise(async (resolve)=>{
+    if(!base64){resolve();return;}
     try{
-      if(!base64){resolve();return;}
-      if(state.currentAudio){state.currentAudio.pause();state.currentAudio=null;}
-      const audio=new Audio();
-      audio.src=base64;
-      audio.preload='auto';
-      state.currentAudio=audio;
+      if(state.currentAudio){
+        state.currentAudio.pause();
+        state.currentAudio=null;
+      }
+
+      // Décoder le base64 en ArrayBuffer et jouer via AudioContext (contourne autoplay)
+      const raw = base64.replace(/^data:audio\/[^;]+;base64,/,'');
+      const binary = atob(raw);
+      const bytes = new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+
+      unlockAudio();
+      const buffer = await audioCtx.decodeAudioData(bytes.buffer);
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+
       setOrbState('speaking');
       document.getElementById('orb-status').textContent='TALCO-IA parle...';
       document.getElementById('orb-status').className='orb-status speaking';
-      audio.onended=()=>{state.currentAudio=null;resolve();};
-      audio.onerror=(e)=>{console.error('Audio error:',e);state.currentAudio=null;resolve();};
-      audio.load();
-      const playPromise=audio.play();
-      if(playPromise!==undefined){
-        playPromise.catch((e)=>{
-          console.warn('Autoplay bloqué:',e);
-          showPlayButton(base64,resolve);
-        });
-      }
-    }catch(e){console.error(e);resolve();}
+
+      source.onended = ()=>{ resolve(); };
+      source.start(0);
+      state.currentAudio = source;
+
+    }catch(e){
+      console.error('Audio error:', e);
+      resolve();
+    }
   });
-}
-
-function showPlayButton(base64, onDone){
-  const status=document.getElementById('orb-status');
-  status.innerHTML='<button onclick="manualPlay()" style="background:var(--gold);color:#111;border:none;padding:8px 18px;border-radius:100px;font-family:Syne,sans-serif;font-weight:700;font-size:12px;cursor:pointer;">▶ Écouter la réponse</button>';
-  window._pendingAudio={base64,onDone};
-}
-
-function manualPlay(){
-  if(!window._pendingAudio)return;
-  const {base64,onDone}=window._pendingAudio;
-  window._pendingAudio=null;
-  const audio=new Audio(base64);
-  state.currentAudio=audio;
-  setOrbState('speaking');
-  document.getElementById('orb-status').textContent='TALCO-IA parle...';
-  document.getElementById('orb-status').className='orb-status speaking';
-  audio.onended=()=>{state.currentAudio=null;onDone();};
-  audio.onerror=()=>{state.currentAudio=null;onDone();};
-  audio.play();
 }
 
 
