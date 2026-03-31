@@ -887,6 +887,12 @@ function unlockAudio() {
     window._pendingAudio = null;
     _playAudioNow(base64, resolve);
   }
+  // Play stored init audio if any
+  if (window._pendingAudioBase64) {
+    const b64 = window._pendingAudioBase64;
+    window._pendingAudioBase64 = null;
+    playAudio(b64);
+  }
 }
 
 async function handleOrbClick() {
@@ -998,7 +1004,15 @@ async function sendToAgent(audioBase64, textInput) {
     if (data.speech) addBubble('agent', data.speech);
     updateFieldsRecap();
 
-    if (data.audio_base64) await playAudio(data.audio_base64);
+    // Don't block on audio if it's the init call (audio not unlocked yet)
+    if (data.audio_base64) {
+      if (window._audioUnlocked) {
+        await playAudio(data.audio_base64);
+      } else {
+        // Store for later playback on first user interaction
+        window._pendingAudioBase64 = data.audio_base64;
+      }
+    }
 
     if (state.is_complete) {
       setOrbState('idle');
