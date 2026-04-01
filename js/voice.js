@@ -119,14 +119,24 @@ function stopRecording() {
 }
 
 function blobToBase64(blob) {
-  return new Promise((res,rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
-    r.readAsDataURL(blob);
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // r.result = "data:audio/webm;base64,SGVs...aB=="
+      let base64 = reader.result;
+      
+      // Enlever le préfixe data:audio/...;base64,
+      base64 = base64.replace(/^data:audio\/[^;]+;base64,/, '');
+      
+      // Enlever TOUS les whitespace
+      base64 = base64.replace(/\s+/g, '');
+      
+      res(base64);  // ← Envoie JUSTE "SGVs...aB==" sans préfixe
+    };
+    reader.onerror = rej;
+    reader.readAsDataURL(blob);
   });
 }
-
 function toggleContinuousMode() {
   continuousMode = !continuousMode;
   const bar   = document.getElementById('mode-bar');
