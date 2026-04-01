@@ -972,6 +972,7 @@ async function sendToAgent(audioBase64, textInput) {
   if (state.isProcessing) return;
   state.isProcessing = true;
   document.getElementById('sending-indicator').classList.add('visible');
+  document.getElementById('orb-status').textContent = 'Connexion...';
   if (audioBase64) addBubble('user', '🎤 Message vocal');
 
   const typingId = 'typing-' + Date.now();
@@ -989,10 +990,21 @@ async function sendToAgent(audioBase64, textInput) {
     if (textInput === '__init__') payload.text_input = '__init__';
     else if (textInput) payload.text_input = textInput;
 
+    document.getElementById('orb-status').textContent = 'Envoi au serveur...';
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+
     const resp = await fetch(CONFIG.VOICE_URL, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
+
+    document.getElementById('orb-status').textContent = 'Réponse reçue...';
+
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
 
@@ -1009,7 +1021,6 @@ async function sendToAgent(audioBase64, textInput) {
       if (window._audioUnlocked) {
         await playAudio(data.audio_base64);
       } else {
-        // Store for later playback on first user interaction
         window._pendingAudioBase64 = data.audio_base64;
       }
     }
@@ -1022,15 +1033,19 @@ async function sendToAgent(audioBase64, textInput) {
     }
   } catch(e) {
     removeTyping(typingId);
-    addBubble('agent', 'Désolé, une erreur s\'est produite. Réessaie.');
-    showToast('Erreur : ' + e.message);
+    const errMsg = e.name === 'AbortError' ? 'Timeout — le serveur ne répond pas' : e.message;
+    addBubble('agent', 'Erreur : ' + errMsg);
+    document.getElementById('orb-status').textContent = 'Erreur : ' + errMsg;
+    showToast('Erreur : ' + errMsg);
   } finally {
     state.isProcessing = false;
     document.getElementById('sending-indicator').classList.remove('visible');
     if (!state.is_complete && !state.currentAudio) {
       setOrbState('idle');
-      document.getElementById('orb-status').textContent = 'Appuie pour parler';
-      document.getElementById('orb-status').className = 'orb-status';
+      if (!document.getElementById('orb-status').textContent.startsWith('Erreur')) {
+        document.getElementById('orb-status').textContent = 'Appuie pour parler';
+        document.getElementById('orb-status').className = 'orb-status';
+      }
     }
   }
 }
