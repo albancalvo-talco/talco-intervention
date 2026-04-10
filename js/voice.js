@@ -1,4 +1,4 @@
-// ══ VOICE CHAT — Logique agent vocal ══
+// ══ VOICE CHAT — Logique agent vocal (corrigé) ══
 
 const FIELD_LABELS = {
   nom_client:'Client', numero_affaire:'Affaire',
@@ -13,12 +13,26 @@ const FIELD_LABELS = {
 const FIELD_ORDER = Object.keys(FIELD_LABELS);
 
 let state = {
-  user:null, session_id:null, history:[], responses:{},
-  is_complete:false, isListening:false, isProcessing:false,
-  mediaRecorder:null, audioChunks:[], currentAudio:null
+  user: null,
+  session_id: null,
+  history: [],
+  responses: {},
+  is_complete: false,
+  isListening: false,
+  isProcessing: false,
+  // FIX #4 : guard init séparé pour éviter double __init__
+  isInitializing: false,
+  mediaRecorder: null,
+  audioChunks: [],
+  currentAudio: null,
+  // FIX #5 : queue audio unique — pas de race condition
+  pendingAudio: null,
+  audioUnlocked: false
 };
+
 let continuousMode = true;
 let convCount = 0;
+const TIMEOUT_MS = 60000;
 
 // ══ INIT ══
 window.addEventListener('DOMContentLoaded', () => {
@@ -26,31 +40,50 @@ window.addEventListener('DOMContentLoaded', () => {
   initAuth();
 });
 
-// Appelé par common.js après auth réussie
 function onUserAuthenticated(user) {
   state.user = user;
   document.getElementById('user-name').textContent = user.name.split(' ')[0];
   const av = document.getElementById('user-avatar');
-  if(user.picture) av.innerHTML = `<img src="${user.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+  if (user.picture) av.innerHTML = `<img src="${user.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
   else av.textContent = user.initials;
   startSession();
 }
 
 function startSession() {
-  state.session_id = `session_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
-  state.history = []; state.responses = {}; state.is_complete = false; convCount = 0;
+  // FIX #4 + #5 : reset complet de tous les guards et de l'audio
+  state.session_id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  state.history = [];
+  state.responses = {};
+  state.is_complete = false;
+  state.isListening = false;
+  state.isProcessing = false;
+  state.isInitializing = false;
+  state.pendingAudio = null;
+  convCount = 0;
+
+  if (state.currentAudio) {
+    try { state.currentAudio.pause(); } catch(e) {}
+    state.currentAudio = null;
+  }
+
   document.getElementById('conv-history').innerHTML = '';
-  document.getElementById('conv-count').textContent = '0';
+  const countEl = document.getElementById('conv-count');
+  if (countEl) countEl.textContent = '0';
   document.getElementById('conv-panel')?.classList.remove('open');
   document.getElementById('conv-toggle')?.classList.remove('open');
+  document.getElementById('orb-wrap').style.opacity = '';
+  document.getElementById('orb-wrap').style.pointerEvents = '';
+  setOrbState('idle');
+  document.getElementById('orb-status').textContent = 'Connexion...';
+  document.getElementById('orb-status').className = 'orb-status';
+
   updateFieldsRecap();
   showScreen('chat');
+  // FIX #4 : utiliser isInitializing pour l'init
   sendToAgent(null, '__init__');
 }
 
-function newSession() {
-  startSession();
-}
+function newSession() { startSession(); }
 
 // ══ CONVERSATION PANEL ══
 function toggleConvPanel() {
@@ -58,41 +91,51 @@ function toggleConvPanel() {
   document.getElementById('conv-toggle').classList.toggle('open');
 }
 
-// ══ MICRO ══
+// ══ AUDIO UNLOCK ══
+// FIX #5 : unlock propre, joue le pendingAudio s'il existe (un seul à la fois)
 function unlockAudio() {
-  if(window._audioUnlocked) return;
-  window._audioUnlocked = true;
+  if (state.audioUnlocked) return;
+  state.audioUnlocked = true;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const buf = ctx.createBuffer(1,1,22050);
+    const buf = ctx.createBuffer(1, 1, 22050);
     const src = ctx.createBufferSource();
-    src.buffer = buf; src.connect(ctx.destination); src.start(0);
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
     setTimeout(() => ctx.close(), 500);
   } catch(e) {}
-  // Jouer l'audio en attente si présent
-  if(window._pendingAudio) {
-    const {base64, resolve} = window._pendingAudio;
-    window._pendingAudio = null;
+
+  // FIX #5 : jouer l'audio en attente s'il y en a un (pas de double)
+  if (state.pendingAudio) {
+    const { base64, resolve } = state.pendingAudio;
+    state.pendingAudio = null;
     _playAudioNow(base64, resolve);
   }
 }
 
+// ══ MICRO ══
 async function handleOrbClick() {
-  if(state.isProcessing) return;
+  // FIX #4 : bloquer si init en cours
+  if (state.isProcessing || state.isInitializing) {
+    unlockAudio();
+    return;
+  }
   unlockAudio();
-  if(state.isListening) stopRecording();
+  if (state.isListening) stopRecording();
   else await startRecording();
 }
 
 async function startRecording() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     state.audioChunks = [];
-    state.mediaRecorder = new MediaRecorder(stream, {mimeType:'audio/webm'});
-    state.mediaRecorder.ondataavailable = e => { if(e.data.size>0) state.audioChunks.push(e.data); };
+    state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    state.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) state.audioChunks.push(e.data); };
     state.mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(state.audioChunks, {type:'audio/webm'});
+      const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
+      // FIX #2 : envoyer base64 SANS préfixe — cohérent avec playAudio qui normalise
       const b64 = await blobToBase64(blob);
       sendToAgent(b64, null);
     };
@@ -108,7 +151,7 @@ async function startRecording() {
 }
 
 function stopRecording() {
-  if(state.mediaRecorder && state.isListening) {
+  if (state.mediaRecorder && state.isListening) {
     state.mediaRecorder.stop();
     state.isListening = false;
     document.getElementById('orb-wrap').classList.remove('listening');
@@ -118,41 +161,42 @@ function stopRecording() {
   }
 }
 
+// FIX #2 : retire le préfixe et les whitespaces — base64 pur uniquement
 function blobToBase64(blob) {
   return new Promise((res, rej) => {
     const reader = new FileReader();
     reader.onload = () => {
-      // r.result = "data:audio/webm;base64,SGVs...aB=="
-      let base64 = reader.result;
-      
-      // Enlever le préfixe data:audio/...;base64,
-      base64 = base64.replace(/^data:audio\/[^;]+;base64,/, '');
-      
-      // Enlever TOUS les whitespace
-      base64 = base64.replace(/\s+/g, '');
-      
-      res(base64);  // ← Envoie JUSTE "SGVs...aB==" sans préfixe
+      const base64 = reader.result
+        .replace(/^data:audio\/[^;]+;base64,/, '')
+        .replace(/\s+/g, '');
+      res(base64);
     };
     reader.onerror = rej;
     reader.readAsDataURL(blob);
   });
 }
+
 function toggleContinuousMode() {
   continuousMode = !continuousMode;
   const bar   = document.getElementById('mode-bar');
   const label = document.getElementById('mode-label');
   bar.className = 'mode-bar' + (continuousMode ? ' on' : '');
   label.textContent = continuousMode ? 'Continu activé' : 'Mode continu';
-  if(continuousMode && !state.isListening && !state.isProcessing) startRecording();
-  else if(!continuousMode) showToast('Mode continu désactivé');
+  if (continuousMode && !state.isListening && !state.isProcessing) startRecording();
+  else if (!continuousMode) showToast('Mode continu désactivé');
 }
 
 // ══ AGENT ══
 async function sendToAgent(audioBase64, textInput) {
-  if(state.isProcessing) return;
+  // FIX #4 : guard strict
+  if (state.isProcessing) return;
+
+  const isInit = textInput === '__init__';
+  if (isInit) state.isInitializing = true;
   state.isProcessing = true;
+
   document.getElementById('sending-indicator').classList.add('visible');
-  if(audioBase64) addBubble('user', '🎤 Message vocal');
+  if (audioBase64) addBubble('user', '🎤 Message vocal');
   const typingId = 'typing-' + Date.now();
   addTyping(typingId);
 
@@ -164,30 +208,43 @@ async function sendToAgent(audioBase64, textInput) {
       history:      state.history,
       responses:    state.responses
     };
-    if(audioBase64)              payload.audio_base64 = audioBase64;
-    if(textInput === '__init__') payload.text_input   = '__init__';
+    if (audioBase64) payload.audio_base64 = audioBase64;
+    if (isInit)      payload.text_input   = '__init__';
+
+    const ctrl = new AbortController();
+    const tmout = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
 
     const resp = await fetch(CONFIG.VOICE_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
     });
-    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    clearTimeout(tmout);
+
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
 
     removeTyping(typingId);
     state.history   = data.history   || state.history;
-    state.responses = {...state.responses, ...(data.responses||{})};
+    state.responses = { ...state.responses, ...(data.responses || {}) };
     state.is_complete = data.is_complete || false;
 
-    if(data.speech) addBubble('agent', data.speech);
+    if (data.speech) addBubble('agent', data.speech);
     updateFieldsRecap();
 
-    if(data.audio_base64) await playAudio(data.audio_base64);
+    // FIX #3 : jouer l'audio AVANT de relancer le mode continu
+    // Le await garantit que le micro ne repart pas pendant que l'agent parle
+    if (data.audio_base64) {
+      await playAudio(data.audio_base64);
+    }
 
-    if(continuousMode && !state.is_complete)
-      setTimeout(() => startRecording(), 500);
+    // FIX #3 : relance du mode continu APRÈS la fin du TTS
+    if (continuousMode && !state.is_complete) {
+      setTimeout(() => startRecording(), 400);
+    }
 
-    if(state.is_complete) {
+    if (state.is_complete) {
       setOrbState('idle');
       document.getElementById('orb-status').textContent = 'Rapport complet ✓';
       document.getElementById('orb-status').className = 'orb-status';
@@ -197,12 +254,18 @@ async function sendToAgent(audioBase64, textInput) {
 
   } catch(e) {
     removeTyping(typingId);
+    const msg = e.name === 'AbortError' ? 'Timeout — serveur trop long' : e.message;
     addBubble('agent', 'Désolé, une erreur s\'est produite. Réessaie.');
-    showToast('Erreur : ' + e.message);
+    showToast('Erreur : ' + msg);
+    setOrbState('idle');
+    document.getElementById('orb-status').textContent = 'Erreur — appuie pour réessayer';
+    document.getElementById('orb-status').className = 'orb-status';
   } finally {
     state.isProcessing = false;
+    if (isInit) state.isInitializing = false;
     document.getElementById('sending-indicator').classList.remove('visible');
-    if(!state.is_complete && !state.currentAudio) {
+    // Ne reset le statut orbe QUE si on n'est pas en train de parler ou d'écouter
+    if (!state.is_complete && !state.currentAudio && !state.isListening) {
       setOrbState('idle');
       document.getElementById('orb-status').textContent = 'Appuie pour parler';
       document.getElementById('orb-status').className = 'orb-status';
@@ -211,31 +274,57 @@ async function sendToAgent(audioBase64, textInput) {
 }
 
 // ══ AUDIO TTS ══
+// FIX #2 : normalise le base64 (avec ou sans préfixe data:)
 function _playAudioNow(base64, resolve) {
   try {
-    if(state.currentAudio) { try{state.currentAudio.pause();}catch(e){} state.currentAudio=null; }
-    const raw   = base64.replace(/^data:audio\/[^;]+;base64,/,'');
+    if (state.currentAudio) {
+      try { state.currentAudio.pause(); } catch(e) {}
+      state.currentAudio = null;
+    }
+    // Normalisation : retire le préfixe s'il existe, nettoie les espaces
+    const raw = base64.replace(/^data:audio\/[^;]+;base64,/, '').replace(/\s+/g, '');
+    if (!raw) { resolve(); return; }
+
     const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
-    const blob  = new Blob([bytes], {type:'audio/mpeg'});
+    const blob  = new Blob([bytes], { type: 'audio/mpeg' });
     const url   = URL.createObjectURL(blob);
     const audio = new Audio(url);
     state.currentAudio = audio;
+
     setOrbState('speaking');
     document.getElementById('orb-status').textContent = 'TALCO-IA parle...';
     document.getElementById('orb-status').className   = 'orb-status speaking';
-    audio.onended = () => { URL.revokeObjectURL(url); state.currentAudio=null; resolve(); };
-    audio.onerror = () => { URL.revokeObjectURL(url); state.currentAudio=null; resolve(); };
-    audio.play().catch(e => { console.error('play() failed:', e); URL.revokeObjectURL(url); state.currentAudio=null; resolve(); });
-  } catch(e) { console.error(e); resolve(); }
+
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      state.currentAudio = null;
+    };
+    audio.onended = () => { cleanup(); resolve(); };
+    audio.onerror = () => { cleanup(); resolve(); };
+    audio.play().catch(e => {
+      console.error('play() failed:', e);
+      cleanup();
+      resolve();
+    });
+  } catch(e) {
+    console.error('_playAudioNow error:', e);
+    resolve();
+  }
 }
 
+// FIX #5 : un seul pendingAudio à la fois — le deuxième appel écrase le premier
+// mais résout l'ancien promise pour éviter les leaks
 async function playAudio(base64) {
   return new Promise(resolve => {
-    if(!base64) { resolve(); return; }
-    if(window._audioUnlocked) {
+    if (!base64) { resolve(); return; }
+    if (state.audioUnlocked) {
       _playAudioNow(base64, resolve);
     } else {
-      window._pendingAudio = {base64, resolve};
+      // FIX #5 : résoudre l'ancien pending avant d'en créer un nouveau
+      if (state.pendingAudio) {
+        state.pendingAudio.resolve();
+      }
+      state.pendingAudio = { base64, resolve };
       setOrbState('speaking');
       document.getElementById('orb-status').textContent = 'Appuie sur l\'orbe pour écouter';
       document.getElementById('orb-status').className   = 'orb-status speaking';
@@ -248,14 +337,14 @@ function addBubble(role, text) {
   const hist = document.getElementById('conv-history');
   const div  = document.createElement('div');
   div.className = 'bubble ' + role;
-  const label = role==='agent' ? 'TALCO-IA' : state.user.name.split(' ')[0];
+  const label = role === 'agent' ? 'TALCO-IA' : state.user.name.split(' ')[0];
   div.innerHTML = `<div class="bubble-label">${label}</div>${escHtml(text)}`;
   hist.appendChild(div);
   hist.scrollTop = hist.scrollHeight;
   convCount++;
   const countEl = document.getElementById('conv-count');
-  if(countEl) countEl.textContent = convCount;
-  if(convCount === 1) {
+  if (countEl) countEl.textContent = convCount;
+  if (convCount === 1) {
     document.getElementById('conv-panel')?.classList.add('open');
     document.getElementById('conv-toggle')?.classList.add('open');
   }
@@ -264,8 +353,8 @@ function addBubble(role, text) {
 function addTyping(id) {
   const hist = document.getElementById('conv-history');
   const div  = document.createElement('div');
-  div.className='bubble typing'; div.id=id;
-  div.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>';
+  div.className = 'bubble typing'; div.id = id;
+  div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
   hist.appendChild(div);
   hist.scrollTop = hist.scrollHeight;
 }
@@ -280,7 +369,7 @@ function updateFieldsRecap() {
     const chip = document.createElement('div');
     chip.className = 'field-chip' + (val ? ' done' : '');
     chip.innerHTML = `<div class="fc-dot"></div><span class="fc-label">${FIELD_LABELS[key]}</span>`;
-    if(val) chip.title = val;
+    if (val) chip.title = val;
     recap.appendChild(chip);
   });
 }
