@@ -78,6 +78,49 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .mic-zone.started .mic-start-state{display:none;}
 .mic-zone.started .mic-active-state{display:flex;}
 
+/* SÉLECTEUR VOIX */
+.voice-selector{
+  position:relative;display:flex;align-items:center;
+}
+.voice-btn{
+  display:flex;align-items:center;gap:5px;
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:100px;padding:5px 10px;
+  font-family:'DM Mono',monospace;font-size:9px;
+  color:var(--text2);cursor:pointer;transition:all .2s;
+  letter-spacing:.06em;
+}
+.voice-btn:active,.voice-btn.open{border-color:rgba(232,169,0,.4);color:var(--gold);}
+.voice-btn svg{width:11px;height:11px;flex-shrink:0;}
+.voice-dropdown{
+  position:absolute;top:calc(100% + 8px);right:0;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;z-index:300;
+  min-width:210px;box-shadow:0 8px 32px rgba(0,0,0,.5);
+  opacity:0;pointer-events:none;transform:translateY(-6px);
+  transition:all .2s cubic-bezier(.4,0,.2,1);
+}
+.voice-dropdown.open{opacity:1;pointer-events:all;transform:translateY(0);}
+.voice-option{
+  display:flex;flex-direction:column;gap:2px;
+  padding:10px 14px;cursor:pointer;transition:background .15s;
+  border-bottom:1px solid var(--border);
+}
+.voice-option:last-child{border-bottom:none;}
+.voice-option:hover{background:var(--s2);}
+.voice-option.active{background:rgba(232,169,0,.07);}
+.vo-name{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;}
+.vo-name.active::after{content:'✓';color:var(--gold);font-size:10px;margin-left:auto;}
+.vo-desc{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);}
+
+/* PTT — feedback visuel appui long */
+.walkie-btn{touch-action:none;user-select:none;-webkit-user-select:none;}
+.walkie-btn.listening{
+  animation:walkiePulse 1.2s ease-in-out infinite;
+  filter:drop-shadow(0 0 18px rgba(224,82,82,.55));
+}
+.walkie-btn.listening svg{filter:brightness(0) saturate(100%) invert(38%) sepia(82%) saturate(2000%) hue-rotate(338deg) brightness(95%) contrast(92%);}
+
 /* Bouton commencer */
 .btn-start{
   width:100%;max-width:320px;
@@ -232,6 +275,20 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
         <div class="avatar" id="user-avatar">T</div>
         <span id="user-name">Tech</span>
       </div>
+      <div class="voice-selector" id="voice-selector">
+        <button class="voice-btn" id="voice-btn" onclick="toggleVoiceDropdown()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span id="voice-btn-label">VOIX</span>
+        </button>
+        <div class="voice-dropdown" id="voice-dropdown">
+          <div class="voice-option" data-voice="alloy"   onclick="selectVoice('alloy')">  <div class="vo-name" id="vo-alloy">Alloy</div>  <div class="vo-desc">Neutre · mixte équilibrée</div></div>
+          <div class="voice-option" data-voice="echo"    onclick="selectVoice('echo')">   <div class="vo-name" id="vo-echo">Echo</div>    <div class="vo-desc">Masculine · ton professionnel</div></div>
+          <div class="voice-option" data-voice="fable"   onclick="selectVoice('fable')">  <div class="vo-name" id="vo-fable">Fable</div>  <div class="vo-desc">Expressive · ton narratif</div></div>
+          <div class="voice-option" data-voice="onyx"    onclick="selectVoice('onyx')">   <div class="vo-name" id="vo-onyx">Onyx</div>    <div class="vo-desc">Grave · idéale terrain</div></div>
+          <div class="voice-option" data-voice="nova"    onclick="selectVoice('nova')">   <div class="vo-name" id="vo-nova">Nova</div>    <div class="vo-desc">Féminine · ton énergique</div></div>
+          <div class="voice-option" data-voice="shimmer" onclick="selectVoice('shimmer')"><div class="vo-name" id="vo-shimmer">Shimmer</div><div class="vo-desc">Féminine · ton doux</div></div>
+        </div>
+      </div>
       <button class="btn-new" onclick="newSession()">NOUVEAU</button>
     </div>
   </div>
@@ -261,7 +318,11 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 
       <!-- ÉTAT ACTIF : walkie grand + statut + bouton écrit en dessous -->
       <div class="mic-active-state">
-        <button class="walkie-btn" id="walkie-btn" onclick="handleMicClick()">
+        <button class="walkie-btn" id="walkie-btn"
+          onpointerdown="handlePTTStart(event)"
+          onpointerup="handlePTTEnd(event)"
+          onpointercancel="handlePTTEnd(event)"
+          onpointerleave="handlePTTEnd(event)">
           <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="44" y="2" width="4" height="22" rx="2" fill="currentColor"/><circle cx="46" cy="4" r="3" fill="currentColor"/>
             <rect x="28" y="22" width="36" height="62" rx="6" fill="currentColor"/>
@@ -277,7 +338,7 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
             <rect x="38" y="84" width="16" height="6" rx="2" fill="currentColor" opacity=".5"/>
           </svg>
         </button>
-        <div class="mic-status" id="mic-status">Appuie pour parler</div>
+        <div class="mic-status" id="mic-status">Maintiens pour parler</div>
         <div class="timeout-bar-wrap" id="timeout-bar-wrap"><div class="timeout-bar" id="timeout-bar"></div></div>
         <button class="btn-writing-mode" id="btn-writing-mode-active" onclick="toggleWritingMode()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -459,11 +520,30 @@ function addBubble(role,text){
 function addTyping(id){const feed=document.getElementById('feed-scroll');const div=document.createElement('div');div.className='bubble typing';div.id=id;div.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>';feed.appendChild(div);feed.scrollTop=feed.scrollHeight;}
 function removeTyping(id){document.getElementById(id)?.remove();}
 
-async function handleMicClick(){
-  if(state.isProcessing||state.isInitializing)return;
-  if(state.isListening){stopRecording();return;}
+// ══ PUSH TO TALK ══
+// PTT state : on suit si le pointer est encore enfoncé
+let _pttActive = false;
+
+async function handlePTTStart(e){
+  e.preventDefault(); // empêche le scroll et le context menu mobile
+  if(state.isProcessing||state.isInitializing||state.isListening) return;
+  // Stopper l'audio en cours si le technicien appuie pendant que l'agent parle
+  if(state.currentAudio){
+    try{state.currentAudio.pause();}catch(err){}
+    state.currentAudio=null;
+    document.getElementById('walkie-btn').classList.remove('speaking');
+  }
+  _pttActive=true;
+  document.getElementById('walkie-btn').setPointerCapture(e.pointerId);
   await startRecording();
 }
+
+function handlePTTEnd(e){
+  if(!_pttActive) return;
+  _pttActive=false;
+  if(state.isListening) stopRecording();
+}
+
 async function startRecording(){
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
@@ -473,12 +553,18 @@ async function startRecording(){
     state.mediaRecorder.onstop=async()=>{
       stream.getTracks().forEach(t=>t.stop());
       const blob=new Blob(state.audioChunks,{type:'audio/webm'});
+      if(blob.size < 1000){
+        // Trop court — probablement un tap accidentel
+        updateMicStatus('Maintiens pour parler');
+        document.getElementById('walkie-btn').classList.remove('listening','processing');
+        return;
+      }
       const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.replace(/^data:audio\/[^;]+;base64,/,'').replace(/\s+/g,''));r.onerror=rej;r.readAsDataURL(blob);});
       sendToAgent(b64,null);
     };
     state.mediaRecorder.start();state.isListening=true;
     document.getElementById('walkie-btn').classList.add('listening');
-    updateMicStatus('Écoute... (appuie pour arrêter)');
+    updateMicStatus('🔴 Parle maintenant...');
   }catch(e){showToast('Micro non disponible');}
 }
 function stopRecording(){
@@ -486,7 +572,7 @@ function stopRecording(){
     state.mediaRecorder.stop();state.isListening=false;
     document.getElementById('walkie-btn').classList.remove('listening');
     document.getElementById('walkie-btn').classList.add('processing');
-    updateMicStatus('Traitement...');
+    updateMicStatus('Envoi...');
   }
 }
 function sendTextInput(){
@@ -522,7 +608,7 @@ async function sendToAgent(audioBase64,textInput){
     if(data.speech)addBubble('agent',data.speech);
     updateFieldsRecap();
     if(state.writingMode)syncWritingPanelValues();
-    if(data.audio_base64)await playAudio(data.audio_base64);
+    if(data.audio_base64)await playAudio(data.audio_base64, data.speech||'');
     if(state.is_complete){updateMicStatus('Rapport complet ✓');showPreview();}
   }catch(e){
     hideTimeoutBar();removeTyping(typingId);
@@ -532,11 +618,20 @@ async function sendToAgent(audioBase64,textInput){
     state.isProcessing=false;
     document.getElementById('walkie-btn').classList.remove('processing','listening');
     if(!state.is_complete&&!document.getElementById('mic-status').textContent.startsWith('Erreur')&&!document.getElementById('mic-status').textContent.startsWith('Rapport'))
-      updateMicStatus('Appuie pour parler');
+      updateMicStatus('Maintiens pour parler');
   }
 }
 
-async function playAudio(base64){
+async function playAudio(base64, speech){
+  // 1. Essayer le fichier local préenregistré en priorité
+  if(speech){
+    const localUrl = _getLocalAudioUrl(speech);
+    if(localUrl){
+      const ok = await playLocalAudio(localUrl);
+      if(ok !== false) return; // succès → on s'arrête là
+    }
+  }
+  // 2. Fallback : audio base64 du TTS serveur
   return new Promise(resolve=>{
     if(!base64){resolve();return;}
     try{
@@ -558,13 +653,16 @@ async function playAudio(base64){
   });
 }
 
-// Bouton "Commencer le rapport" — passe en mode vocal actif
+// Bouton "Commencer le rapport" — passe en mode vocal actif et lance l'init
 async function startReport(){
   document.getElementById('mic-zone').classList.add('started');
   document.getElementById('feed-empty')?.remove();
-  state.isInitializing=true;
-  await sendToAgent(null,'__init__');
-  state.isInitializing=false;
+  // Lancer l'init seulement si pas encore fait
+  if(state.history.length===0 && !state.isInitializing && !state.isProcessing){
+    state.isInitializing=true;
+    await sendToAgent(null,'__init__');
+    state.isInitializing=false;
+  }
 }
 
 // Bouton "Remplir à l'écrit" depuis l'état initial
@@ -916,7 +1014,135 @@ function showConfirmation(){
   showScreen('confirmation');
 }
 
+// ══ VOIX PRÉENREGISTRÉES ══
+const VOICE_KEY = 'talco_voice';
+const VOICE_PHRASES = ['alloy','echo','fable','onyx','nova','shimmer'];
+let _selectedVoice = localStorage.getItem(VOICE_KEY) || 'onyx';
+
+// Map des phrases → fichier audio local
+const AUDIO_MAP = {
+  'init':                 'init',
+  'nom_client':           'nom_client',
+  'numero_affaire':       'numero_affaire',
+  'date_debut':           'date_debut',
+  'date_fin':             'date_fin',
+  'heure_debut':          'heure_debut',
+  'heure_fin':            'heure_fin',
+  'redacteur':            'redacteur',
+  'techniciens_presents': 'techniciens_presents',
+  'clients_presents':     'clients_presents',
+  'type_intervention':    'type_intervention',
+  'designation_precise':  'designation_precise',
+  'raison_intervention':  'raison_intervention',
+  'chantier_termine':     'chantier_termine',
+  'si_non_details':       'si_non_details',
+  'difficultes':          'difficultes',
+  'points_attention':     'points_attention',
+  'complet':              'complet',
+  'erreur':               'erreur',
+  'ok_court':             'ok_court',
+};
+
+// Textes exacts correspondant aux fichiers audio préenregistrés
+const PHRASE_TEXTS = {
+  "Salut ! On fait le rapport. C'était pour quel client ?": 'init',
+  "C'était pour quel client ?":                             'nom_client',
+  "Quel est le numéro d'affaire ?":                        'numero_affaire',
+  "Quelle est la date de début ?":                         'date_debut',
+  "Et la date de fin ?":                                   'date_fin',
+  "À quelle heure vous avez commencé ?":                   'heure_debut',
+  "Et vous avez fini à quelle heure ?":                    'heure_fin',
+  "Ton prénom et nom ?":                                   'redacteur',
+  "Quels techniciens étaient présents ?":                  'techniciens_presents',
+  "Des clients étaient présents sur site ?":               'clients_presents',
+  "Quel type d'intervention ?":                            'type_intervention',
+  "Décris ce qui a été fait.":                             'designation_precise',
+  "Quelle était la raison de l'intervention ?":            'raison_intervention',
+  "Le chantier est terminé ?":                             'chantier_termine',
+  "Qu'est-ce qu'il reste à faire ?":                       'si_non_details',
+  "Des difficultés rencontrées ?":                         'difficultes',
+  "Des points d'attention pour le prochain intervenant ?": 'points_attention',
+  "C'est bon, j'ai tout. Je sauvegarde le rapport.":       'complet',
+  "J'ai pas compris. Tu peux répéter ?":                   'erreur',
+  "OK, noté.":                                             'ok_court',
+};
+
+function _getLocalAudioUrl(speech){
+  // Cherche correspondance exacte
+  const key = PHRASE_TEXTS[speech?.trim()];
+  if(key) return `audio/${_selectedVoice}/${key}.mp3`;
+  // Cherche correspondance partielle (l'agent peut légèrement varier)
+  for(const [text, k] of Object.entries(PHRASE_TEXTS)){
+    if(speech && speech.includes(text.slice(0,20))) return `audio/${_selectedVoice}/${k}.mp3`;
+  }
+  return null;
+}
+
+async function playLocalAudio(url){
+  return new Promise(resolve=>{
+    const audio = new Audio(url);
+    if(state.currentAudio){try{state.currentAudio.pause();}catch(e){}state.currentAudio=null;}
+    state.currentAudio = audio;
+    document.getElementById('walkie-btn').classList.add('speaking');
+    updateMicStatus('TALCO-IA parle...');
+    const cleanup=()=>{state.currentAudio=null;document.getElementById('walkie-btn').classList.remove('speaking');};
+    audio.onended=()=>{cleanup();resolve();};
+    audio.onerror=()=>{
+      // Fichier local absent → fallback TTS base64
+      cleanup();resolve(false);
+    };
+    audio.play().catch(()=>{cleanup();resolve(false);});
+  });
+}
+
+// Sélecteur voix UI
+function toggleVoiceDropdown(){
+  const dd = document.getElementById('voice-dropdown');
+  const btn = document.getElementById('voice-btn');
+  const isOpen = dd.classList.contains('open');
+  dd.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+  if(!isOpen){
+    // Fermer en cliquant ailleurs
+    setTimeout(()=>document.addEventListener('click', closeVoiceOnClick, {once:true}), 0);
+  }
+}
+function closeVoiceOnClick(e){
+  if(!document.getElementById('voice-selector').contains(e.target)){
+    document.getElementById('voice-dropdown').classList.remove('open');
+    document.getElementById('voice-btn').classList.remove('open');
+  }
+}
+function selectVoice(voice){
+  _selectedVoice = voice;
+  localStorage.setItem(VOICE_KEY, voice);
+  // Update UI
+  document.getElementById('voice-btn-label').textContent = voice.toUpperCase();
+  document.querySelectorAll('.voice-option').forEach(el=>{
+    const isActive = el.dataset.voice === voice;
+    el.classList.toggle('active', isActive);
+    el.querySelector('.vo-name').classList.toggle('active', isActive);
+  });
+  document.getElementById('voice-dropdown').classList.remove('open');
+  document.getElementById('voice-btn').classList.remove('open');
+  // Prévisualiser la voix
+  const previewUrl = `audio/${voice}/init.mp3`;
+  const preview = new Audio(previewUrl);
+  preview.volume = 0.7;
+  preview.play().catch(()=>{}); // silencieux si fichier absent
+  showToast('Voix : ' + voice);
+}
+function initVoiceSelector(){
+  document.getElementById('voice-btn-label').textContent = _selectedVoice.toUpperCase();
+  document.querySelectorAll('.voice-option').forEach(el=>{
+    const isActive = el.dataset.voice === _selectedVoice;
+    el.classList.toggle('active', isActive);
+    el.querySelector('.vo-name').classList.toggle('active', isActive);
+  });
+}
+
 window.addEventListener('DOMContentLoaded',()=>{
+  initVoiceSelector();
   setTimeout(()=>{if(!window.google)document.getElementById('btn-fallback').style.display='flex';},4000);
   const saved=loadUserSession();if(saved)onUserAuthenticated(saved);
 });
