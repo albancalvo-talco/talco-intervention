@@ -630,8 +630,7 @@ function buildWritingCards(){
         else delete state.responses[q.key];
         inp.classList.toggle('filled',!!inp.value);
         updateFieldsRecap();updateWritingProgress();
-        // Auto-avance pour les dates
-        if(inp.value)setTimeout(()=>writingNav(1),380);
+        // Pas d'auto-avance sur mobile — le picker natif déclenche change trop tôt
       });
       card.appendChild(inp);
     } else if(q.type==='time'){
@@ -643,7 +642,7 @@ function buildWritingCards(){
         else delete state.responses[q.key];
         inp.classList.toggle('filled',!!inp.value);
         updateFieldsRecap();updateWritingProgress();
-        if(inp.value)setTimeout(()=>writingNav(1),380);
+        // Pas d'auto-avance sur mobile
       });
       card.appendChild(inp);
     } else {
