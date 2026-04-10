@@ -1,4 +1,4 @@
-// ══ PWA v8 — Logique formulaire guidé ══
+// ══ PWA v8 — Logique formulaire guidé (corrigé) ══
 
 const QUESTIONS = [
   {key:'nom_client',           text:"Nom du client ?",                                  hint:"",                                        cat:"identification"},
@@ -64,11 +64,16 @@ function renderStep() {
   document.getElementById('tile-active').classList.remove('orb-open');
   document.getElementById('bottom-bar').style.display = 'none';
   rebuildHistory();
-  if(state.step===13 && state.responses.chantier_termine?.toLowerCase().includes('oui')){
+
+  // FIX #6 : trim() + toLowerCase() pour éviter " OUI " ou "oui" qui rate le skip
+  if(state.step===13 && state.responses.chantier_termine?.trim().toLowerCase()==='oui'){
     state.responses.si_non_details=''; state.step=14; renderStep(); return;
   }
+
   openOrb();
-  const intro = state.step===0 ? `Bonjour ${state.user.name.split(' ')[0]}. Je vais vous guider. ${q.text}` : q.text;
+  const intro = state.step===0
+    ? `Bonjour ${state.user.name.split(' ')[0]}. Je vais vous guider pour remplir le rapport. ${q.text}`
+    : q.text;
   setTimeout(()=>speak(intro,()=>{}), 150);
 }
 
@@ -85,7 +90,7 @@ function renderPhotoMode() {
   rebuildHistory();
   closeOrb();
   document.getElementById('bottom-bar').style.display = 'block';
-  speak('Parfait. Ajoutez vos photos puis terminez.');
+  speak('Parfait. Ajoutez vos photos si nécessaire, puis terminez le rapport.');
 }
 
 // ══ HISTORIQUE ══
@@ -134,6 +139,7 @@ function initSpeechRecognition() {
   if(!SR){ showToast('Reconnaissance vocale : Chrome requis'); return; }
   state.recognition = new SR();
   state.recognition.lang='fr-FR'; state.recognition.continuous=false; state.recognition.interimResults=true;
+
   state.recognition.onresult = (e) => {
     let interim='', final='';
     for(let i=e.resultIndex; i<e.results.length; i++) {
@@ -141,6 +147,7 @@ function initSpeechRecognition() {
       else interim+=e.results[i][0].transcript;
     }
     const raw = (final||interim).trim();
+
     if(state.awaitingConfirmation) {
       if(final) {
         const cmd = normalizeCmd(final);
@@ -150,17 +157,26 @@ function initSpeechRecognition() {
       }
       setOrbTranscript(raw,!final); setTileAnswer(raw,!final); return;
     }
+
     if(final) {
       const cmd = normalizeCmd(final);
       if(cmd==='valider' && state.transcript){ stopListening(); demanderConfirmation('valider'); return; }
       if(cmd==='passer'){ stopListening(); demanderConfirmation('passer'); return; }
       if(cmd==='reprendre'){ stopListening(); reprendreChamp(); return; }
-      state.transcript=final; setOrbTranscript(state.transcript,false); setTileAnswer(state.transcript,false);
-      stopListening(); normaliserChamp(state.transcript); return;
+      state.transcript=final;
+      setOrbTranscript(state.transcript,false);
+      setTileAnswer(state.transcript,false);
+      stopListening();
+      normaliserChamp(state.transcript);
+      return;
     }
     state.transcript=raw; setOrbTranscript(raw,true); setTileAnswer(raw,true);
   };
-  state.recognition.onerror = (e) => { stopListening(); if(e.error!=='no-speech') showToast('Micro : '+e.error); };
+
+  state.recognition.onerror = (e) => {
+    stopListening();
+    if(e.error!=='no-speech') showToast('Micro : '+e.error);
+  };
   state.recognition.onend = () => { if(state.isListening) stopListening(); };
 }
 
@@ -205,14 +221,17 @@ async function normaliserChamp(texte) {
     numero_affaire:`Normalise au format YYYY-NNN. Date : ${new Date().toLocaleDateString('fr-FR')}. Texte : "${texte}"`,
     date_debut:`Format JJ/MM/AAAA. Date du jour : ${new Date().toLocaleDateString('fr-FR')}. Texte : "${texte}"`,
     date_fin:`Format JJ/MM/AAAA. Date du jour : ${new Date().toLocaleDateString('fr-FR')}. Texte : "${texte}"`,
-    heure_debut:`Format HH:MM 24h : "${texte}"`, heure_fin:`Format HH:MM 24h : "${texte}"`,
+    heure_debut:`Format HH:MM 24h : "${texte}"`,
+    heure_fin:`Format HH:MM 24h : "${texte}"`,
     redacteur:`Format "Prénom NOM" : "${texte}"`,
     techniciens_presents:`Liste "Prénom NOM" séparés virgules : "${texte}"`,
     clients_presents:`Normalise. Si rien → "Aucun" : "${texte}"`,
     type_intervention:`Parmi : Installation / Maintenance préventive / Maintenance curative / Mise en service / Raccordement fibre / Dépannage SAV / Audit / Tirage câble / Soudure fibre / Mesure OTDR / Programmation / Autre. Texte : "${texte}"`,
     designation_precise:`Reformule pro, sans hésitations : "${texte}"`,
     raison_intervention:`Reformule raison intervention, concis : "${texte}"`,
-    chantier_termine:`"OUI" ou "NON" uniquement : "${texte}"`,
+    // FIX #6 : normalisation chantier_termine renvoie "oui" ou "non" minuscule
+    // pour que le skip step 13→14 fonctionne avec .trim().toLowerCase()
+    chantier_termine:`Réponds UNIQUEMENT "oui" ou "non" en minuscules : "${texte}"`,
     si_non_details:`Reformule actions restantes : "${texte}"`,
     difficultes:`Reformule. Si rien → "Aucune" : "${texte}"`,
     points_attention:`Reformule. Si rien → "Aucun" : "${texte}"`
@@ -220,22 +239,40 @@ async function normaliserChamp(texte) {
   try {
     const resp = await fetch(CONFIG.NORMALIZE_URL, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({prompt:PROMPTS[q.key]||`Normalise : "${texte}"`, field_key:q.key, raw_text:texte, sender_email:state.user?.email||''})
+      body: JSON.stringify({
+        prompt: PROMPTS[q.key]||`Normalise : "${texte}"`,
+        field_key: q.key,
+        raw_text: texte,
+        sender_email: state.user?.email||''
+      })
     });
     if(!resp.ok) throw new Error('HTTP '+resp.status);
     const data = await resp.json();
-    const normalized=data.normalized||texte, confidence=data.confidence||1, review=data.needs_review||false;
-    state.transcript=normalized; setTileAnswer(normalized,false); setOrbTranscript(normalized,false);
-    showNorm(review||confidence<0.7?'review':'done', review||confidence<0.7?`Confiance ${Math.round(confidence*100)}% — vérifier`:`✓ ${Math.round(confidence*100)}%`);
+    const normalized = data.normalized||texte;
+    const confidence = data.confidence||1;
+    const review = data.needs_review||false;
+    state.transcript = normalized;
+    setTileAnswer(normalized,false);
+    setOrbTranscript(normalized,false);
+    showNorm(
+      review||confidence<0.7?'review':'done',
+      review||confidence<0.7?`Confiance ${Math.round(confidence*100)}% — vérifier`:`✓ ${Math.round(confidence*100)}%`
+    );
     demanderConfirmation('valider');
-  } catch(e) { clearNorm(); demanderConfirmation('valider'); }
+  } catch(e) {
+    clearNorm();
+    demanderConfirmation('valider');
+  }
 }
 function showNorm(type,text) {
   const badge=`<div class="norm-badge ${type}">${text}</div>`;
   document.getElementById('tile-norm').innerHTML=badge;
   document.getElementById('orb-norm').innerHTML=badge;
 }
-function clearNorm() { document.getElementById('tile-norm').innerHTML=''; document.getElementById('orb-norm').innerHTML=''; }
+function clearNorm() {
+  document.getElementById('tile-norm').innerHTML='';
+  document.getElementById('orb-norm').innerHTML='';
+}
 
 // ══ TTS ══
 function speak(text,onEnd) {
@@ -261,13 +298,16 @@ function normalizeCmd(t) {
 }
 function demanderConfirmation(action) {
   state.awaitingConfirmation=true; state.pendingAction=action;
-  const msg=action==='valider'&&state.transcript?`J'ai noté : ${state.transcript}. Valider, reprendre ou passer ?`:'Passer ce champ ? Valider ou reprendre.';
+  const msg=action==='valider'&&state.transcript
+    ? `J'ai noté : ${state.transcript}. Valider, reprendre ou passer ?`
+    : 'Passer ce champ ? Valider ou reprendre.';
   document.getElementById('orb-valid').style.display='flex';
   document.getElementById('orb-reprendre').style.display='flex';
   speak(msg,()=>setTimeout(()=>startListening(),300));
 }
 function confirmerAction() {
-  state.awaitingConfirmation=false; const action=state.pendingAction; state.pendingAction=null;
+  state.awaitingConfirmation=false;
+  const action=state.pendingAction; state.pendingAction=null;
   document.getElementById('orb-valid').style.display='none';
   document.getElementById('orb-reprendre').style.display='none';
   clearNorm(); stopListening(); closeOrb();
@@ -305,16 +345,48 @@ function skipQuestion() {
   demanderConfirmation('passer');
 }
 
-// ══ PHOTOS ══
-function handlePhotos(input) {
-  Array.from(input.files).slice(0,5-state.photoFiles.length).forEach(file=>{
-    if(state.photoFiles.length>=5) return;
-    state.photoFiles.push(file);
-    const url=URL.createObjectURL(file); state.photos.push(url);
-    addPhotoThumb(url,state.photos.length-1);
+// ══ PHOTOS — compression Canvas ══
+async function compressImage(file){
+  return new Promise(resolve=>{
+    const MAX=1200, QUALITY=0.82;
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.width, h=img.height;
+      if(w<=MAX&&h<=MAX){ resolve(file); return; }
+      if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>{
+        if(!blob){ resolve(file); return; }
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/,'.jpg'), {type:'image/jpeg',lastModified:Date.now()}));
+      },'image/jpeg',QUALITY);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); resolve(file); };
+    img.src=url;
   });
-  updatePhotoUI(); input.value='';
 }
+
+async function handlePhotos(input) {
+  const files=Array.from(input.files).slice(0,5-state.photoFiles.length);
+  input.value='';
+  if(!files.length) return;
+  showToast('Compression…');
+  for(const file of files){
+    if(state.photoFiles.length>=5) break;
+    const c=await compressImage(file);
+    state.photoFiles.push(c);
+    const url=URL.createObjectURL(c);
+    state.photos.push(url);
+    addPhotoThumb(url,state.photos.length-1);
+  }
+  updatePhotoUI();
+  const ko=Math.round(state.photoFiles.reduce((s,f)=>s+f.size,0)/1024);
+  showToast(`${state.photoFiles.length} photo${state.photoFiles.length>1?'s':''} · ${ko} ko`);
+}
+
 function addPhotoThumb(url,i) {
   const el=document.createElement('div'); el.className='photo-thumb'; el.id='pthumb-'+i;
   el.innerHTML=`<img src="${url}"><div class="rm-ph" onclick="removePhoto(${i})">✕</div>`;
@@ -323,7 +395,8 @@ function addPhotoThumb(url,i) {
 function removePhoto(i) {
   state.photos.splice(i,1); state.photoFiles.splice(i,1);
   document.querySelectorAll('.photo-thumb').forEach(el=>el.remove());
-  state.photos.forEach((url,idx)=>addPhotoThumb(url,idx)); updatePhotoUI();
+  state.photos.forEach((url,idx)=>addPhotoThumb(url,idx));
+  updatePhotoUI();
 }
 function updatePhotoUI() {
   const c=state.photoFiles.length;
@@ -339,22 +412,40 @@ async function terminerPhotos() {
   document.getElementById('loading').classList.add('visible');
   setTimeout(()=>{ document.getElementById('lstep-1').className='loading-step done'; document.getElementById('lstep-2').className='loading-step active'; },700);
   setTimeout(()=>{ document.getElementById('lstep-2').className='loading-step done'; document.getElementById('lstep-3').className='loading-step active'; },1800);
-  try{ await envoyerRapport(); }catch(e){ hideLoading(); showToast('Erreur : '+e.message); }
+  try{ await envoyerRapport(); }
+  catch(e){ hideLoading(); showToast('Erreur : '+e.message); }
 }
+
 async function envoyerRapport() {
   const fd=new FormData();
-  fd.append('data',JSON.stringify({senderEmail:state.user.email,senderName:state.user.name,source:'pwa-v8',responses:state.responses}));
+  fd.append('data', JSON.stringify({
+    senderEmail: state.user.email,
+    senderName:  state.user.name,
+    source:      'pwa-v8',
+    responses:   state.responses
+  }));
   state.photoFiles.forEach((f,i)=>fd.append(`photo_${i+1}`,f,f.name));
   const resp=await fetch(CONFIG.PWA_URL,{method:'POST',body:fd});
   if(!resp.ok) throw new Error('HTTP '+resp.status);
-  hideLoading(); afficherConfirmation();
+  hideLoading();
+  afficherConfirmation();
 }
+
 function afficherConfirmation() {
   const r=state.responses;
-  document.getElementById('confirm-recap').innerHTML=`<strong>👷 ${state.user.name}</strong><br>Client : <strong>${r.nom_client||'—'}</strong><br>Affaire : <strong>${r.numero_affaire||'—'}</strong><br>Date : <strong>${r.date_debut||'—'}</strong> → <strong>${r.date_fin||'—'}</strong><br>Horaires : ${r.heure_debut||'?'} → ${r.heure_fin||'?'}<br>Type : <strong>${r.type_intervention||'—'}</strong><br>Terminé : <strong>${r.chantier_termine||'—'}</strong><br>Photos : <strong>${state.photoFiles.length}</strong>`;
+  document.getElementById('confirm-recap').innerHTML=
+    `<strong>👷 ${state.user.name}</strong><br>` +
+    `Client : <strong>${r.nom_client||'—'}</strong><br>` +
+    `Affaire : <strong>${r.numero_affaire||'—'}</strong><br>` +
+    `Date : <strong>${r.date_debut||'—'}</strong> → <strong>${r.date_fin||'—'}</strong><br>` +
+    `Horaires : ${r.heure_debut||'?'} → ${r.heure_fin||'?'}<br>` +
+    `Type : <strong>${r.type_intervention||'—'}</strong><br>` +
+    `Terminé : <strong>${r.chantier_termine||'—'}</strong><br>` +
+    `Photos : <strong>${state.photoFiles.length}</strong>`;
   showScreen('confirmation');
-  speak('Rapport enregistré. Merci '+state.user.name.split(' ')[0]);
+  speak('Rapport enregistré avec succès. Merci '+state.user.name.split(' ')[0]);
 }
+
 function nouveauRapport() {
   state.step=0; state.responses={}; state.photos=[]; state.photoFiles=[]; state.inPhotoMode=false;
   document.querySelectorAll('.photo-thumb').forEach(el=>el.remove());
@@ -364,7 +455,9 @@ function nouveauRapport() {
   document.getElementById('tile-answer-box').style.display='';
   document.getElementById('tile-photos-content').style.display='none';
   document.getElementById('bottom-bar').style.display='none';
-  showScreen('rapport'); renderStep();
+  showScreen('rapport');
+  renderStep();
 }
+
 function hideLoading(){ document.getElementById('loading').classList.remove('visible'); }
 if(window.speechSynthesis) speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
