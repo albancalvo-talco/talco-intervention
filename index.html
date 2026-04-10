@@ -22,16 +22,12 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .btn-google svg{width:20px;height:20px;}
 .login-note{font-size:11px;color:var(--text3);text-align:center;}
 #login-error{display:none;padding:10px 16px;background:rgba(224,82,82,.1);border:1px solid var(--danger);border-radius:10px;font-size:12px;color:var(--danger);text-align:center;max-width:300px;}
-/* HEADER */
+/* HEADER — simplifié : logo TALCO à gauche, avatar + NOUVEAU à droite */
 .header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--s1);border-bottom:1px solid var(--border);flex-shrink:0;}
 .header-user{display:flex;align-items:center;gap:8px;font-family:Syne,sans-serif;font-size:12px;font-weight:600;}
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--gold);color:#111;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;}
-.header-actions{display:flex;align-items:center;gap:8px;}
+.header-right{display:flex;align-items:center;gap:8px;}
 .btn-new{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);background:transparent;border:1px solid var(--border);border-radius:100px;padding:5px 10px;cursor:pointer;}
-/* MODE TOGGLE */
-.mode-toggle-btn{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border);border-radius:100px;padding:5px 12px;cursor:pointer;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);letter-spacing:.06em;transition:all .2s;}
-.mode-toggle-btn.writing{border-color:rgba(232,169,0,.4);background:rgba(232,169,0,.08);color:var(--gold);}
-.mode-toggle-btn svg{width:12px;height:12px;flex-shrink:0;}
 /* LAYOUT */
 .main-body{flex:1;display:grid;grid-template-columns:1fr 78px;grid-template-rows:1fr auto;overflow:hidden;}
 /* FEED */
@@ -63,11 +59,55 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .f-chip .fc-label{font-family:'DM Mono',monospace;font-size:7px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .f-chip.done .fc-label{color:rgba(78,203,122,.7);}
 .f-chip.active-q .fc-label{color:var(--gold);}
-/* MIC ZONE */
-.mic-zone{grid-column:1;grid-row:2;background:var(--bg);border-top:1px solid var(--border);padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;}
-.walkie-btn{width:80px;height:80px;border-radius:20px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .3s cubic-bezier(.34,1.56,.64,1);}
-.walkie-btn:active{transform:scale(.92);}
-.walkie-btn svg{width:60px;height:60px;transition:filter .4s;}
+/* MIC ZONE — grande, centrée, sans input texte */
+.mic-zone{
+  grid-column:1;grid-row:2;background:var(--bg);
+  border-top:1px solid var(--border);
+  padding:20px 16px 24px;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+}
+/* État initial : bouton "Commencer le rapport" visible, walkie caché */
+.mic-start-state{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;}
+.mic-active-state{display:none;flex-direction:column;align-items:center;gap:14px;width:100%;}
+.mic-zone.started .mic-start-state{display:none;}
+.mic-zone.started .mic-active-state{display:flex;}
+
+/* Bouton commencer */
+.btn-start{
+  width:100%;max-width:320px;
+  padding:18px 24px;border-radius:16px;border:none;
+  background:var(--gold);color:#111;
+  font-family:Syne,sans-serif;font-size:16px;font-weight:800;
+  cursor:pointer;letter-spacing:-.01em;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 4px 24px rgba(232,169,0,.25);
+  transition:transform .15s,box-shadow .15s;
+}
+.btn-start:active{transform:scale(.97);box-shadow:0 2px 12px rgba(232,169,0,.15);}
+.btn-start svg{width:20px;height:20px;flex-shrink:0;}
+
+/* Bouton écrit — sous le bouton commencer, centré */
+.btn-writing-mode{
+  display:flex;align-items:center;gap:8px;
+  background:transparent;border:1px solid var(--border);
+  border-radius:100px;padding:9px 18px;
+  font-family:'DM Mono',monospace;font-size:10px;
+  color:var(--text2);letter-spacing:.08em;
+  cursor:pointer;transition:all .2s;
+}
+.btn-writing-mode:active{border-color:var(--gold);color:var(--gold);}
+.btn-writing-mode.writing{border-color:rgba(232,169,0,.4);background:rgba(232,169,0,.08);color:var(--gold);}
+.btn-writing-mode svg{width:13px;height:13px;flex-shrink:0;}
+
+/* Walkie talkie — bien grand */
+.walkie-btn{
+  width:130px;height:130px;border-radius:24px;border:none;
+  background:transparent;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+}
+.walkie-btn:active{transform:scale(.93);}
+.walkie-btn svg{width:100px;height:100px;transition:filter .4s;}
 .walkie-btn svg{filter:brightness(0) invert(.85);}
 .walkie-btn.listening svg{filter:brightness(0) saturate(100%) invert(38%) sepia(82%) saturate(2000%) hue-rotate(338deg) brightness(95%) contrast(92%);}
 .walkie-btn.listening{animation:walkiePulse 1.2s ease-in-out infinite;}
@@ -76,15 +116,9 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .walkie-btn.processing svg{filter:brightness(0) invert(.4);opacity:.6;}
 @keyframes walkiePulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
 .mic-status{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.08em;text-align:center;min-height:16px;}
-.timeout-bar-wrap{width:100%;max-width:400px;height:2px;background:var(--s3);border-radius:2px;overflow:hidden;opacity:0;transition:opacity .3s;}
+.timeout-bar-wrap{width:100%;max-width:300px;height:2px;background:var(--s3);border-radius:2px;overflow:hidden;opacity:0;transition:opacity .3s;}
 .timeout-bar-wrap.visible{opacity:1;}
 .timeout-bar{height:100%;background:var(--gold);border-radius:2px;width:100%;transition:width linear;}
-.input-row{display:flex;align-items:center;gap:8px;width:100%;max-width:400px;}
-.text-input{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:100px;padding:10px 16px;font-size:13px;color:var(--text);outline:none;}
-.text-input::placeholder{color:var(--text3);}
-.text-input:focus{border-color:rgba(232,169,0,.3);}
-.btn-send{width:38px;height:38px;border-radius:50%;background:var(--gold);border:none;color:#111;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.btn-send svg{width:16px;height:16px;}
 /* MODE ECRIT — PANNEAU */
 .writing-panel{position:fixed;inset:0;z-index:200;pointer-events:none;}
 .writing-panel.open{pointer-events:all;}
@@ -187,11 +221,7 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 <div id="screen-chat" class="screen">
   <div class="header">
     <span style="font-family:Syne,sans-serif;font-size:14px;font-weight:700;color:var(--gold);">TALCO</span>
-    <div class="header-actions">
-      <button class="mode-toggle-btn" id="mode-toggle-btn" onclick="toggleWritingMode()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        <span id="mode-toggle-label">ÉCRIT</span>
-      </button>
+    <div class="header-right">
       <div class="header-user">
         <div class="avatar" id="user-avatar">T</div>
         <span id="user-name">Tech</span>
@@ -207,28 +237,48 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
     </div>
     <div class="fields-col" id="fields-col"><div class="fields-col-title">Champs</div></div>
     <div class="mic-zone" id="mic-zone">
-      <button class="walkie-btn" id="walkie-btn" onclick="handleMicClick()">
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="44" y="2" width="4" height="22" rx="2" fill="currentColor"/><circle cx="46" cy="4" r="3" fill="currentColor"/>
-          <rect x="28" y="22" width="36" height="62" rx="6" fill="currentColor"/>
-          <rect x="34" y="30" width="24" height="14" rx="3" fill="#0a0a0a" opacity=".6"/>
-          <line x1="37" y1="35" x2="55" y2="35" stroke="#0a0a0a" stroke-width="1.5" opacity=".3"/>
-          <line x1="37" y1="39" x2="50" y2="39" stroke="#0a0a0a" stroke-width="1.5" opacity=".3"/>
-          <line x1="36" y1="52" x2="56" y2="52" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
-          <line x1="36" y1="56" x2="56" y2="56" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
-          <line x1="36" y1="60" x2="56" y2="60" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
-          <line x1="36" y1="64" x2="56" y2="64" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
-          <line x1="36" y1="68" x2="56" y2="68" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
-          <rect x="22" y="36" width="6" height="14" rx="2" fill="currentColor" opacity=".7"/>
-          <rect x="38" y="84" width="16" height="6" rx="2" fill="currentColor" opacity=".5"/>
-        </svg>
-      </button>
-      <div class="mic-status" id="mic-status">Appuie pour parler</div>
-      <div class="timeout-bar-wrap" id="timeout-bar-wrap"><div class="timeout-bar" id="timeout-bar"></div></div>
-      <div class="input-row">
-        <input type="text" class="text-input" id="text-input" placeholder="Ou tape ton message..." autocomplete="off">
-        <button class="btn-send" onclick="sendTextInput()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+
+      <!-- ÉTAT INITIAL : bouton commencer + bouton écrit -->
+      <div class="mic-start-state">
+        <button class="btn-start" onclick="startReport()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+          </svg>
+          Commencer le rapport
+        </button>
+        <button class="btn-writing-mode" id="btn-writing-mode-start" onclick="startWritingMode()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Remplir à l'écrit
+        </button>
       </div>
+
+      <!-- ÉTAT ACTIF : walkie grand + statut + bouton écrit en dessous -->
+      <div class="mic-active-state">
+        <button class="walkie-btn" id="walkie-btn" onclick="handleMicClick()">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="44" y="2" width="4" height="22" rx="2" fill="currentColor"/><circle cx="46" cy="4" r="3" fill="currentColor"/>
+            <rect x="28" y="22" width="36" height="62" rx="6" fill="currentColor"/>
+            <rect x="34" y="30" width="24" height="14" rx="3" fill="#0a0a0a" opacity=".6"/>
+            <line x1="37" y1="35" x2="55" y2="35" stroke="#0a0a0a" stroke-width="1.5" opacity=".3"/>
+            <line x1="37" y1="39" x2="50" y2="39" stroke="#0a0a0a" stroke-width="1.5" opacity=".3"/>
+            <line x1="36" y1="52" x2="56" y2="52" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
+            <line x1="36" y1="56" x2="56" y2="56" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
+            <line x1="36" y1="60" x2="56" y2="60" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
+            <line x1="36" y1="64" x2="56" y2="64" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
+            <line x1="36" y1="68" x2="56" y2="68" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
+            <rect x="22" y="36" width="6" height="14" rx="2" fill="currentColor" opacity=".7"/>
+            <rect x="38" y="84" width="16" height="6" rx="2" fill="currentColor" opacity=".5"/>
+          </svg>
+        </button>
+        <div class="mic-status" id="mic-status">Appuie pour parler</div>
+        <div class="timeout-bar-wrap" id="timeout-bar-wrap"><div class="timeout-bar" id="timeout-bar"></div></div>
+        <button class="btn-writing-mode" id="btn-writing-mode-active" onclick="toggleWritingMode()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <span id="writing-mode-label">Passer à l'écrit</span>
+        </button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -350,7 +400,9 @@ function startSession(){
   state.photoFiles=[];state.photoUrls=[];
   if(state.currentAudio){try{state.currentAudio.pause();}catch(e){}state.currentAudio=null;}
   closeWritingPanel();
-  document.getElementById('feed-scroll').innerHTML='<div class="feed-empty" id="feed-empty">Appuie sur le micro ou le bouton ÉCRIT pour commencer</div>';
+  // Reset état initial : afficher bouton commencer, cacher walkie
+  document.getElementById('mic-zone').classList.remove('started');
+  document.getElementById('feed-scroll').innerHTML='<div class="feed-empty" id="feed-empty">Appuie sur <strong style="color:var(--gold)">Commencer le rapport</strong> ou <strong style="color:var(--gold)">Remplir à l\'écrit</strong></div>';
   document.getElementById('walkie-btn').className='walkie-btn';
   updateMicStatus('Appuie pour parler');
   hideTimeoutBar();
@@ -404,7 +456,6 @@ function removeTyping(id){document.getElementById(id)?.remove();}
 async function handleMicClick(){
   if(state.isProcessing||state.isInitializing)return;
   if(state.isListening){stopRecording();return;}
-  if(state.history.length===0){state.isInitializing=true;await sendToAgent(null,'__init__');state.isInitializing=false;return;}
   await startRecording();
 }
 async function startRecording(){
@@ -501,13 +552,32 @@ async function playAudio(base64){
   });
 }
 
-// ══ MODE ECRIT ══
+// Bouton "Commencer le rapport" — passe en mode vocal actif
+async function startReport(){
+  document.getElementById('mic-zone').classList.add('started');
+  document.getElementById('feed-empty')?.remove();
+  state.isInitializing=true;
+  await sendToAgent(null,'__init__');
+  state.isInitializing=false;
+}
+
+// Bouton "Remplir à l'écrit" depuis l'état initial
+function startWritingMode(){
+  document.getElementById('mic-zone').classList.add('started');
+  state.writingMode=true;
+  document.getElementById('btn-writing-mode-active').classList.add('writing');
+  document.getElementById('writing-mode-label').textContent='Mode vocal';
+  openWritingPanel();
+  updateFieldsRecap();
+}
+
+// Bascule vocal ↔ écrit depuis l'état actif
 function toggleWritingMode(){
   state.writingMode=!state.writingMode;
-  const btn=document.getElementById('mode-toggle-btn');
-  const label=document.getElementById('mode-toggle-label');
-  if(state.writingMode){btn.classList.add('writing');label.textContent='VOCAL';openWritingPanel();}
-  else{btn.classList.remove('writing');label.textContent='ÉCRIT';closeWritingPanel();}
+  const btn=document.getElementById('btn-writing-mode-active');
+  const label=document.getElementById('writing-mode-label');
+  if(state.writingMode){btn.classList.add('writing');label.textContent='Mode vocal';openWritingPanel();}
+  else{btn.classList.remove('writing');label.textContent='Passer à l\'écrit';closeWritingPanel();}
   updateFieldsRecap();
 }
 
@@ -661,8 +731,10 @@ function closeWritingPanel(){
   document.getElementById('writing-panel').classList.remove('open');
   if(state.writingMode){
     state.writingMode=false;
-    document.getElementById('mode-toggle-btn').classList.remove('writing');
-    document.getElementById('mode-toggle-label').textContent='ÉCRIT';
+    const btn=document.getElementById('btn-writing-mode-active');
+    if(btn){btn.classList.remove('writing');}
+    const label=document.getElementById('writing-mode-label');
+    if(label)label.textContent='Passer à l\'écrit';
     updateFieldsRecap();
   }
 }
