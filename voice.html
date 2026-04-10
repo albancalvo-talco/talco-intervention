@@ -13,6 +13,20 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/common.css">
 <link rel="stylesheet" href="css/voice.css">
+<style>
+/* FIX overflow grid sur petit écran quand panel ouvert */
+.chat-body {
+  grid-template-rows: auto auto 1fr auto;
+}
+.conv-panel.open {
+  max-height: 38vh;
+}
+/* Assure que la mic-zone ne déborde jamais */
+.mic-zone {
+  min-height: 0;
+  flex-shrink: 0;
+}
+</style>
 </head>
 <body>
 
@@ -76,7 +90,7 @@
     <!-- Zone orbe -->
     <div class="mic-zone">
       <div class="orb-wrap" id="orb-wrap" onclick="handleOrbClick()">
-        <div class="orb-layer orb-bg" id="orb-bg"></div>
+        <div class="orb-layer orb-bg idle" id="orb-bg"></div>
         <div class="orb-layer orb-mid"></div>
         <div class="orb-layer orb-core"></div>
         <div class="orb-layer orb-shine"></div>
@@ -86,16 +100,16 @@
           <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
         </svg>
       </div>
-      <div class="orb-wave" id="orb-wave">
+      <div class="orb-wave idle" id="orb-wave">
         <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
         <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
         <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
         <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
       </div>
-      <div class="orb-status" id="orb-status">Appuie pour parler</div>
+      <div class="orb-status" id="orb-status">Connexion...</div>
     </div>
 
-    <!-- Barre mode continu — bas de page -->
+    <!-- Barre mode continu -->
     <div class="mode-bar on" id="mode-bar" onclick="toggleContinuousMode()">
       <div class="mode-toggle-track" id="mode-track">
         <div class="mode-toggle-thumb"></div>
