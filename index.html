@@ -68,21 +68,20 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .walkie-btn{width:80px;height:80px;border-radius:20px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .3s cubic-bezier(.34,1.56,.64,1);position:relative;}
 .walkie-btn:active{transform:scale(.92);}
 .walkie-btn svg{width:60px;height:60px;transition:filter .4s, transform .3s;}
-/* Idle = white/light gray */
 .walkie-btn svg{filter:brightness(0) invert(.85);}
-/* Listening = red (tech parle) */
 .walkie-btn.listening svg{filter:brightness(0) saturate(100%) invert(38%) sepia(82%) saturate(2000%) hue-rotate(338deg) brightness(95%) contrast(92%);}
 .walkie-btn.listening{animation:walkiePulse 1.2s ease-in-out infinite;}
-/* Speaking = gold (agent parle) */
 .walkie-btn.speaking svg{filter:brightness(0) saturate(100%) invert(67%) sepia(67%) saturate(600%) hue-rotate(5deg) brightness(100%) contrast(95%);}
 .walkie-btn.speaking{animation:walkiePulse 1.5s ease-in-out infinite;}
-/* Processing = dim */
 .walkie-btn.processing svg{filter:brightness(0) invert(.4);opacity:.6;}
-@keyframes walkiePulse{
-  0%,100%{transform:scale(1);}
-  50%{transform:scale(1.08);}
-}
+@keyframes walkiePulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
 .mic-status{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.08em;text-align:center;min-height:16px;}
+
+/* PROGRESS BAR TIMEOUT */
+.timeout-bar-wrap{width:100%;max-width:400px;height:2px;background:var(--s3);border-radius:2px;overflow:hidden;opacity:0;transition:opacity .3s;}
+.timeout-bar-wrap.visible{opacity:1;}
+.timeout-bar{height:100%;background:var(--gold);border-radius:2px;width:100%;transition:width linear;}
+
 .input-row{display:flex;align-items:center;gap:8px;width:100%;max-width:400px;}
 .text-input{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:100px;padding:10px 16px;font-size:13px;color:var(--text);outline:none;}
 .text-input::placeholder{color:var(--text3);}
@@ -134,15 +133,9 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .spinner{width:36px;height:36px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .loading-text{font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);}
-
-/* DEBUG */
-#debug{position:fixed;top:0;left:0;right:0;background:rgba(232,169,0,.15);color:var(--gold);font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;z-index:999;text-align:center;pointer-events:none;}
 </style>
 </head>
 <body>
-
-<!-- DEBUG BANNER -->
-<div id="debug">Chargement...</div>
 
 <!-- LOGIN -->
 <div id="screen-login" class="screen active">
@@ -186,29 +179,26 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
     <div class="mic-zone">
       <button class="walkie-btn" id="walkie-btn" onclick="handleMicClick()">
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Antenna -->
           <rect x="44" y="2" width="4" height="22" rx="2" fill="currentColor"/>
           <circle cx="46" cy="4" r="3" fill="currentColor"/>
-          <!-- Body -->
           <rect x="28" y="22" width="36" height="62" rx="6" fill="currentColor"/>
-          <!-- Screen -->
           <rect x="34" y="30" width="24" height="14" rx="3" fill="#0a0a0a" opacity=".6"/>
-          <!-- Screen lines -->
           <line x1="37" y1="35" x2="55" y2="35" stroke="#0a0a0a" stroke-width="1.5" opacity=".3"/>
           <line x1="37" y1="39" x2="50" y2="39" stroke="#0a0a0a" stroke-width="1.5" opacity=".3"/>
-          <!-- Speaker grille -->
           <line x1="36" y1="52" x2="56" y2="52" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
           <line x1="36" y1="56" x2="56" y2="56" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
           <line x1="36" y1="60" x2="56" y2="60" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
           <line x1="36" y1="64" x2="56" y2="64" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
           <line x1="36" y1="68" x2="56" y2="68" stroke="#0a0a0a" stroke-width="1.2" opacity=".25"/>
-          <!-- Side button -->
           <rect x="22" y="36" width="6" height="14" rx="2" fill="currentColor" opacity=".7"/>
-          <!-- Bottom clip -->
           <rect x="38" y="84" width="16" height="6" rx="2" fill="currentColor" opacity=".5"/>
         </svg>
       </button>
       <div class="mic-status" id="mic-status">Appuie pour parler</div>
+      <!-- FIX #7 : barre de progression timeout visible -->
+      <div class="timeout-bar-wrap" id="timeout-bar-wrap">
+        <div class="timeout-bar" id="timeout-bar"></div>
+      </div>
       <div class="input-row">
         <input type="text" class="text-input" id="text-input" placeholder="Ou tape ton message..." autocomplete="off">
         <button class="btn-send" onclick="sendTextInput()">
@@ -251,7 +241,8 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 const CONFIG = {
   GOOGLE_CLIENT_ID: '303849110460-10rqg6oco2jseasj4ccsh1n0e4btulea.apps.googleusercontent.com',
   VOICE_URL: 'https://n8n.talco-lr.com/webhook/talco-voice-chat',
-  ALLOWED_DOMAIN: 'talco-lr.com'
+  ALLOWED_DOMAIN: 'talco-lr.com',
+  TIMEOUT_MS: 60000
 };
 
 const FIELD_LABELS = {
@@ -265,329 +256,471 @@ const FIELD_ORDER = Object.keys(FIELD_LABELS);
 
 // ══ STATE ══
 let state = {
-  user:null, session_id:null, history:[], responses:{},
-  is_complete:false, isProcessing:false, isListening:false,
-  mediaRecorder:null, audioChunks:[], currentAudio:null,
-  photoFiles:[], photoUrls:[]
+  user: null,
+  session_id: null,
+  history: [],
+  responses: {},
+  is_complete: false,
+  // FIX #4 : séparer isInitializing de isProcessing
+  isInitializing: false,
+  isProcessing: false,
+  isListening: false,
+  mediaRecorder: null,
+  audioChunks: [],
+  currentAudio: null,
+  photoFiles: [],
+  photoUrls: [],
+  // FIX #5 : queue audio pour éviter la race condition
+  pendingAudio: null
 };
 
 const SESSION_KEY = 'talco_user_session';
-const SESSION_TTL = 7*24*60*60*1000;
-
-// ══ DEBUG ══
-function dbg(msg) {
-  console.log('[TALCO]', msg);
-  const el = document.getElementById('debug');
-  if (el) el.textContent = msg;
-}
+const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
 // ══ AUTH ══
-function saveUserSession(u) { localStorage.setItem(SESSION_KEY, JSON.stringify({user:u, expires:Date.now()+SESSION_TTL})); }
+function saveUserSession(u) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ user: u, expires: Date.now() + SESSION_TTL }));
+}
 function loadUserSession() {
-  try { const d=JSON.parse(localStorage.getItem(SESSION_KEY)); if(!d||Date.now()>d.expires){localStorage.removeItem(SESSION_KEY);return null;} return d.user; } catch(e){return null;}
+  try {
+    const d = JSON.parse(localStorage.getItem(SESSION_KEY));
+    if (!d || Date.now() > d.expires) { localStorage.removeItem(SESSION_KEY); return null; }
+    return d.user;
+  } catch(e) { return null; }
 }
 function handleGoogleCredential(r) {
   try {
-    const p=JSON.parse(atob(r.credential.split('.')[1]));
-    const email=p.email||'', name=p.name||email.split('@')[0];
-    if(!email.endsWith('@'+CONFIG.ALLOWED_DOMAIN)){document.getElementById('login-error').style.display='block';return;}
-    const initials=name.split(' ').map(s=>s[0]).join('').slice(0,2).toUpperCase();
-    const user={email,name,initials,picture:p.picture||null};
-    saveUserSession(user); onUserAuthenticated(user);
-  } catch(e){showToast('Erreur connexion');}
+    const p = JSON.parse(atob(r.credential.split('.')[1]));
+    const email = p.email || '', name = p.name || email.split('@')[0];
+    if (!email.endsWith('@' + CONFIG.ALLOWED_DOMAIN)) {
+      document.getElementById('login-error').style.display = 'block'; return;
+    }
+    const initials = name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
+    const user = { email, name, initials, picture: p.picture || null };
+    saveUserSession(user);
+    onUserAuthenticated(user);
+  } catch(e) { showToast('Erreur connexion'); }
 }
 function loginFallback() {
-  const email=prompt('Email:','prenom.nom@talco-lr.com');
-  if(!email||!email.endsWith('@'+CONFIG.ALLOWED_DOMAIN)){document.getElementById('login-error').style.display='block';return;}
-  const name=email.split('@')[0].split('.').map(s=>s.charAt(0).toUpperCase()+s.slice(1)).join(' ');
-  const user={email,name,initials:name.split(' ').map(s=>s[0]).join('').slice(0,2).toUpperCase()};
-  saveUserSession(user); onUserAuthenticated(user);
+  const email = prompt('Email:', 'prenom.nom@talco-lr.com');
+  if (!email || !email.endsWith('@' + CONFIG.ALLOWED_DOMAIN)) {
+    document.getElementById('login-error').style.display = 'block'; return;
+  }
+  const name = email.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+  const user = { email, name, initials: name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase() };
+  saveUserSession(user);
+  onUserAuthenticated(user);
 }
 function onUserAuthenticated(user) {
-  state.user=user;
-  const av=document.getElementById('user-avatar');
-  if(user.picture) av.innerHTML=`<img src="${user.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
-  else av.textContent=user.initials;
-  document.getElementById('user-name').textContent=user.name.split(' ')[0];
-  dbg('Connecté: '+user.name);
+  state.user = user;
+  const av = document.getElementById('user-avatar');
+  if (user.picture) av.innerHTML = `<img src="${user.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+  else av.textContent = user.initials;
+  document.getElementById('user-name').textContent = user.name.split(' ')[0];
   startSession();
 }
 
 // ══ SESSION ══
 function startSession() {
-  state.session_id='s_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-  state.history=[]; state.responses={}; state.is_complete=false;
-  state.photoFiles=[]; state.photoUrls=[]; state.isProcessing=false; state.isListening=false;
-  document.getElementById('feed-scroll').innerHTML='<div class="feed-empty" id="feed-empty">Appuie sur le micro ou tape un message pour commencer</div>';
-  document.getElementById('walkie-btn').className='walkie-btn';
+  // FIX #4 : reset complet des guards
+  state.session_id = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  state.history = [];
+  state.responses = {};
+  state.is_complete = false;
+  state.isInitializing = false;
+  state.isProcessing = false;
+  state.isListening = false;
+  state.photoFiles = [];
+  state.photoUrls = [];
+  // FIX #5 : vider la queue audio
+  state.pendingAudio = null;
+  if (state.currentAudio) {
+    try { state.currentAudio.pause(); } catch(e) {}
+    state.currentAudio = null;
+  }
+  document.getElementById('feed-scroll').innerHTML = '<div class="feed-empty" id="feed-empty">Appuie sur le micro ou tape un message pour commencer</div>';
+  document.getElementById('walkie-btn').className = 'walkie-btn';
   updateMicStatus('Appuie pour parler');
+  hideTimeoutBar();
   updateFieldsRecap();
   showScreen('chat');
-  dbg('Session prête — en attente');
 }
-function newSession(){startSession();}
-function nouveauRapport(){startSession();}
+function newSession() { startSession(); }
+function nouveauRapport() { startSession(); }
 
 // ══ UI ══
-function showScreen(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+n).classList.add('active');}
-function showToast(msg,d=3000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('visible');setTimeout(()=>t.classList.remove('visible'),d);}
-function escHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function updateMicStatus(msg){document.getElementById('mic-status').textContent=msg;}
-function updateFieldsRecap(){
-  const col=document.getElementById('fields-col');
-  col.innerHTML='<div class="fields-col-title">Champs</div>';
-  FIELD_ORDER.forEach(key=>{
-    const val=state.responses[key];
-    const chip=document.createElement('div');
-    chip.className='f-chip'+(val?' done':'');
-    chip.innerHTML=`<div class="fc-dot"></div><span class="fc-label">${FIELD_LABELS[key]}</span>`;
-    if(val) chip.title=val;
-    chip.onclick=()=>openFieldEdit(key);
+function showScreen(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + n).classList.add('active');
+}
+function showToast(msg, d = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('visible');
+  setTimeout(() => t.classList.remove('visible'), d);
+}
+function escHtml(t) {
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function updateMicStatus(msg) { document.getElementById('mic-status').textContent = msg; }
+function updateFieldsRecap() {
+  const col = document.getElementById('fields-col');
+  col.innerHTML = '<div class="fields-col-title">Champs</div>';
+  FIELD_ORDER.forEach(key => {
+    const val = state.responses[key];
+    const chip = document.createElement('div');
+    chip.className = 'f-chip' + (val ? ' done' : '');
+    chip.innerHTML = `<div class="fc-dot"></div><span class="fc-label">${FIELD_LABELS[key]}</span>`;
+    if (val) chip.title = val;
+    chip.onclick = () => openFieldEdit(key);
     col.appendChild(chip);
   });
 }
 
+// FIX #7 : barre de progression timeout
+let _timeoutBarTimer = null;
+function showTimeoutBar(durationMs) {
+  const wrap = document.getElementById('timeout-bar-wrap');
+  const bar = document.getElementById('timeout-bar');
+  wrap.classList.add('visible');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  // forcer le reflow avant d'animer
+  bar.offsetWidth;
+  bar.style.transition = `width ${durationMs}ms linear`;
+  bar.style.width = '0%';
+}
+function hideTimeoutBar() {
+  const wrap = document.getElementById('timeout-bar-wrap');
+  const bar = document.getElementById('timeout-bar');
+  wrap.classList.remove('visible');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+}
+
 // ══ BUBBLES ══
-function addBubble(role,text){
-  const feed=document.getElementById('feed-scroll');
+function addBubble(role, text) {
+  const feed = document.getElementById('feed-scroll');
   document.getElementById('feed-empty')?.remove();
-  const div=document.createElement('div');div.className='bubble '+role;
-  const label=role==='agent'?'TALCO-IA':(state.user?.name?.split(' ')[0]||'Moi');
-  div.innerHTML=`<div class="b-name">${label}</div>${escHtml(text)}`;
-  feed.appendChild(div); feed.scrollTop=feed.scrollHeight;
+  const div = document.createElement('div');
+  div.className = 'bubble ' + role;
+  const label = role === 'agent' ? 'TALCO-IA' : (state.user?.name?.split(' ')[0] || 'Moi');
+  div.innerHTML = `<div class="b-name">${label}</div>${escHtml(text)}`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
 }
-function addTyping(id){
-  const feed=document.getElementById('feed-scroll');
-  const div=document.createElement('div');div.className='bubble typing';div.id=id;
-  div.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>';
-  feed.appendChild(div); feed.scrollTop=feed.scrollHeight;
+function addTyping(id) {
+  const feed = document.getElementById('feed-scroll');
+  const div = document.createElement('div');
+  div.className = 'bubble typing'; div.id = id;
+  div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
 }
-function removeTyping(id){document.getElementById(id)?.remove();}
+function removeTyping(id) { document.getElementById(id)?.remove(); }
 
 // ══ MIC ══
-async function handleMicClick(){
-  if(state.isProcessing) return;
-  if(state.isListening){stopRecording();return;}
-  // First click = init conversation if needed
-  if(state.history.length===0){
-    dbg('Init conversation...');
-    sendToAgent(null,'__init__');
+// FIX #4 : guard isInitializing pour le premier clic, évite double-appel __init__
+async function handleMicClick() {
+  if (state.isProcessing || state.isInitializing) return;
+  if (state.isListening) { stopRecording(); return; }
+  if (state.history.length === 0) {
+    state.isInitializing = true;
+    await sendToAgent(null, '__init__');
+    state.isInitializing = false;
     return;
   }
   await startRecording();
 }
-async function startRecording(){
-  try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    state.audioChunks=[];
-    state.mediaRecorder=new MediaRecorder(stream,{mimeType:'audio/webm'});
-    state.mediaRecorder.ondataavailable=e=>{if(e.data.size>0)state.audioChunks.push(e.data);};
-    state.mediaRecorder.onstop=async()=>{
-      stream.getTracks().forEach(t=>t.stop());
-      const blob=new Blob(state.audioChunks,{type:'audio/webm'});
-      const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
-      sendToAgent(b64,null);
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    state.audioChunks = [];
+    state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    state.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) state.audioChunks.push(e.data); };
+    state.mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
+      // Envoyer base64 SANS préfixe — cohérent avec ce que n8n attend
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.replace(/^data:audio\/[^;]+;base64,/, '').replace(/\s+/g, ''));
+        r.onerror = rej;
+        r.readAsDataURL(blob);
+      });
+      sendToAgent(b64, null);
     };
     state.mediaRecorder.start();
-    state.isListening=true;
+    state.isListening = true;
     document.getElementById('walkie-btn').classList.add('listening');
     updateMicStatus('🎤 Écoute... (appuie pour arrêter)');
-    dbg('Écoute en cours');
-  }catch(e){showToast('Micro non disponible');dbg('Erreur micro: '+e.message);}
+  } catch(e) {
+    showToast('Micro non disponible');
+  }
 }
-function stopRecording(){
-  if(state.mediaRecorder&&state.isListening){
+
+function stopRecording() {
+  if (state.mediaRecorder && state.isListening) {
     state.mediaRecorder.stop();
-    state.isListening=false;
+    state.isListening = false;
     document.getElementById('walkie-btn').classList.remove('listening');
     document.getElementById('walkie-btn').classList.add('processing');
     updateMicStatus('Traitement...');
-    dbg('Arrêt écoute, envoi...');
   }
 }
 
 // ══ TEXT INPUT ══
-function sendTextInput(){
-  const input=document.getElementById('text-input');
-  const text=input.value.trim();
-  if(!text||state.isProcessing) return;
-  input.value='';
+function sendTextInput() {
+  const input = document.getElementById('text-input');
+  const text = input.value.trim();
+  if (!text || state.isProcessing || state.isInitializing) return;
+  input.value = '';
   document.getElementById('feed-empty')?.remove();
-  addBubble('user',text);
-  sendToAgent(null,text);
+  addBubble('user', text);
+  sendToAgent(null, text);
 }
 
 // ══ AGENT ══
-async function sendToAgent(audioBase64,textInput){
-  if(state.isProcessing){dbg('Bloqué: déjà en cours');return;}
-  state.isProcessing=true;
+async function sendToAgent(audioBase64, textInput) {
+  // FIX #4 : guard strict — pas de double appel possible
+  if (state.isProcessing) return;
+  state.isProcessing = true;
+
   document.getElementById('walkie-btn').classList.add('processing');
   updateMicStatus('Connexion au serveur...');
-  dbg('Envoi: '+(textInput||'audio'));
 
-  if(audioBase64) addBubble('user','🎤 Message vocal');
-  const typingId='t_'+Date.now();
+  if (audioBase64) addBubble('user', '🎤 Message vocal');
+  const typingId = 't_' + Date.now();
   addTyping(typingId);
 
-  try{
-    const payload={
-      session_id:state.session_id,
-      sender_email:state.user?.email||'',
-      sender_name:state.user?.name||'',
-      history:state.history,
-      responses:state.responses
+  // FIX #7 : afficher barre de progression timeout
+  showTimeoutBar(CONFIG.TIMEOUT_MS);
+
+  try {
+    // FIX #1 : toujours envoyer en JSON (pas de FormData pour le chat)
+    // Le submit final (photos) utilise FormData séparément via submitReport()
+    const payload = {
+      session_id: state.session_id,
+      sender_email: state.user?.email || '',
+      sender_name: state.user?.name || '',
+      history: state.history,
+      responses: state.responses
     };
-    if(audioBase64) payload.audio_base64=audioBase64;
-    if(textInput==='__init__') payload.text_input='__init__';
-    else if(textInput) payload.text_input=textInput;
+    if (audioBase64) payload.audio_base64 = audioBase64;
+    if (textInput === '__init__') payload.text_input = '__init__';
+    else if (textInput) payload.text_input = textInput;
 
     updateMicStatus('Envoi au serveur...');
-    dbg('Fetch POST → n8n');
 
-    const ctrl=new AbortController();
-    const tmout=setTimeout(()=>ctrl.abort(),60000);
+    const ctrl = new AbortController();
+    const tmout = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
 
-    const resp=await fetch(CONFIG.VOICE_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload),
-      signal:ctrl.signal
+    const resp = await fetch(CONFIG.VOICE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
     });
     clearTimeout(tmout);
-    dbg('Réponse HTTP '+resp.status);
+    hideTimeoutBar();
 
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    const data=await resp.json();
-    dbg('Data OK: '+(data.speech||'').slice(0,40));
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
 
     removeTyping(typingId);
-    state.history=data.history||state.history;
-    state.responses={...state.responses,...(data.responses||{})};
-    state.is_complete=data.is_complete||false;
+    state.history = data.history || state.history;
+    state.responses = { ...state.responses, ...(data.responses || {}) };
+    state.is_complete = data.is_complete || false;
 
-    if(data.speech) addBubble('agent',data.speech);
+    if (data.speech) addBubble('agent', data.speech);
     updateFieldsRecap();
 
-    if(data.audio_base64) await playAudio(data.audio_base64);
+    // FIX #3 (mode continu dans index.html n'existe pas, mais audio doit
+    // être joué AVANT de relâcher isProcessing)
+    if (data.audio_base64) {
+      // FIX #2 : playAudio gère les deux formats (avec ou sans préfixe data:)
+      await playAudio(data.audio_base64);
+    }
 
-    if(state.is_complete){updateMicStatus('Rapport complet ✓');showPreview();}
-  }catch(e){
-    dbg('ERREUR: '+e.message);
+    if (state.is_complete) {
+      updateMicStatus('Rapport complet ✓');
+      showPreview();
+    }
+
+  } catch(e) {
+    hideTimeoutBar();
     removeTyping(typingId);
-    const msg=e.name==='AbortError'?'Timeout serveur':e.message;
-    addBubble('agent','Erreur: '+msg);
-    updateMicStatus('Erreur: '+msg);
-  }finally{
-    state.isProcessing=false;
-    document.getElementById('walkie-btn').classList.remove('processing','listening');
-    if(!state.is_complete&&!document.getElementById('mic-status').textContent.startsWith('Erreur')){
+    const msg = e.name === 'AbortError' ? 'Timeout — serveur trop long' : e.message;
+    addBubble('agent', 'Erreur : ' + msg);
+    updateMicStatus('Erreur — réessaie');
+  } finally {
+    state.isProcessing = false;
+    document.getElementById('walkie-btn').classList.remove('processing', 'listening');
+    if (!state.is_complete && !document.getElementById('mic-status').textContent.startsWith('Erreur') && !document.getElementById('mic-status').textContent.startsWith('Rapport')) {
       updateMicStatus('Appuie pour parler');
     }
   }
 }
 
 // ══ AUDIO ══
-async function playAudio(base64){
-  return new Promise(resolve=>{
-    if(!base64){resolve();return;}
-    try{
-      const raw=base64.replace(/^data:audio\/[^;]+;base64,/,'');
-      const bytes=Uint8Array.from(atob(raw),c=>c.charCodeAt(0));
-      const blob=new Blob([bytes],{type:'audio/mpeg'});
-      const url=URL.createObjectURL(blob);
-      const audio=new Audio(url);
-      state.currentAudio=audio;
+// FIX #2 : gère base64 avec ET sans préfixe "data:audio/..."
+async function playAudio(base64) {
+  return new Promise(resolve => {
+    if (!base64) { resolve(); return; }
+    try {
+      // Normaliser : retirer le préfixe s'il est présent, puis reconstruire proprement
+      const raw = base64.replace(/^data:audio\/[^;]+;base64,/, '').replace(/\s+/g, '');
+      if (!raw) { resolve(); return; }
+      const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      if (state.currentAudio) {
+        try { state.currentAudio.pause(); } catch(e) {}
+        state.currentAudio = null;
+      }
+      state.currentAudio = audio;
       document.getElementById('walkie-btn').classList.add('speaking');
       updateMicStatus('TALCO-IA parle...');
-      audio.onended=()=>{URL.revokeObjectURL(url);state.currentAudio=null;document.getElementById('walkie-btn').classList.remove('speaking');resolve();};
-      audio.onerror=()=>{URL.revokeObjectURL(url);state.currentAudio=null;document.getElementById('walkie-btn').classList.remove('speaking');resolve();};
-      audio.play().catch(()=>{state.currentAudio=null;document.getElementById('walkie-btn').classList.remove('speaking');resolve();});
-    }catch(e){resolve();}
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        state.currentAudio = null;
+        document.getElementById('walkie-btn').classList.remove('speaking');
+      };
+      audio.onended = () => { cleanup(); resolve(); };
+      audio.onerror = () => { cleanup(); resolve(); };
+      audio.play().catch(() => { cleanup(); resolve(); });
+    } catch(e) {
+      resolve();
+    }
   });
 }
 
 // ══ PHOTOS ══
-function handlePhotoInput(input){
-  Array.from(input.files).slice(0,5-state.photoFiles.length).forEach(file=>{
-    if(state.photoFiles.length>=5) return;
-    state.photoFiles.push(file);state.photoUrls.push(URL.createObjectURL(file));
+function handlePhotoInput(input) {
+  Array.from(input.files).slice(0, 5 - state.photoFiles.length).forEach(file => {
+    if (state.photoFiles.length >= 5) return;
+    state.photoFiles.push(file);
+    state.photoUrls.push(URL.createObjectURL(file));
   });
-  input.value=''; rebuildPhotoGrid();
+  input.value = '';
+  rebuildPhotoGrid();
 }
-function rebuildPhotoGrid(){
-  const grid=document.getElementById('photos-grid');if(!grid)return;
-  grid.innerHTML='';
-  state.photoUrls.forEach((url,i)=>{
-    const div=document.createElement('div');div.className='photo-thumb';
-    div.innerHTML=`<img src="${url}"><button class="rm-ph" onclick="removePhoto(${i})">✕</button>`;
+function rebuildPhotoGrid() {
+  const grid = document.getElementById('photos-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  state.photoUrls.forEach((url, i) => {
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `<img src="${url}"><button class="rm-ph" onclick="removePhoto(${i})">✕</button>`;
     grid.appendChild(div);
   });
-  if(state.photoFiles.length<5){
-    const add=document.createElement('label');add.className='photo-add-label';add.setAttribute('for','file-input');
-    add.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Photo</span>';
+  if (state.photoFiles.length < 5) {
+    const add = document.createElement('label');
+    add.className = 'photo-add-label';
+    add.setAttribute('for', 'file-input');
+    add.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Photo</span>';
     grid.appendChild(add);
   }
-  const c=document.getElementById('photo-counter');if(c)c.textContent=state.photoFiles.length+' / 5';
+  const c = document.getElementById('photo-counter');
+  if (c) c.textContent = state.photoFiles.length + ' / 5';
 }
-function removePhoto(i){URL.revokeObjectURL(state.photoUrls[i]);state.photoFiles.splice(i,1);state.photoUrls.splice(i,1);rebuildPhotoGrid();}
+function removePhoto(i) {
+  URL.revokeObjectURL(state.photoUrls[i]);
+  state.photoFiles.splice(i, 1);
+  state.photoUrls.splice(i, 1);
+  rebuildPhotoGrid();
+}
 
 // ══ PREVIEW ══
-function showPreview(){
-  const body=document.getElementById('preview-body');body.innerHTML='';
-  FIELD_ORDER.forEach(key=>{
-    const val=state.responses[key]||'';
-    const div=document.createElement('div');div.className='preview-field';
-    div.innerHTML=`<div class="pf-label">${FIELD_LABELS[key]}</div><input class="pf-value" data-key="${key}" value="${escHtml(val)}" placeholder="Non renseigné">`;
+function showPreview() {
+  const body = document.getElementById('preview-body');
+  body.innerHTML = '';
+  FIELD_ORDER.forEach(key => {
+    const val = state.responses[key] || '';
+    const div = document.createElement('div');
+    div.className = 'preview-field';
+    div.innerHTML = `<div class="pf-label">${FIELD_LABELS[key]}</div><input class="pf-value" data-key="${key}" value="${escHtml(val)}" placeholder="Non renseigné">`;
     body.appendChild(div);
   });
-  const photoDiv=document.createElement('div');photoDiv.className='preview-photos';
-  photoDiv.innerHTML=`<div class="pf-label">Photos chantier <span id="photo-counter">${state.photoFiles.length} / 5</span></div><div class="photos-grid" id="photos-grid"></div>`;
-  body.appendChild(photoDiv);rebuildPhotoGrid();
+  const photoDiv = document.createElement('div');
+  photoDiv.className = 'preview-photos';
+  photoDiv.innerHTML = `<div class="pf-label">Photos chantier <span id="photo-counter">${state.photoFiles.length} / 5</span></div><div class="photos-grid" id="photos-grid"></div>`;
+  body.appendChild(photoDiv);
+  rebuildPhotoGrid();
   document.getElementById('modal-preview').classList.add('visible');
 }
-function closePreview(){
-  document.querySelectorAll('#preview-body .pf-value').forEach(inp=>{
-    const key=inp.dataset.key,val=inp.value.trim();
-    if(val)state.responses[key]=val;else delete state.responses[key];
+function closePreview() {
+  document.querySelectorAll('#preview-body .pf-value').forEach(inp => {
+    const key = inp.dataset.key, val = inp.value.trim();
+    if (val) state.responses[key] = val;
+    else delete state.responses[key];
   });
   updateFieldsRecap();
   document.getElementById('modal-preview').classList.remove('visible');
 }
-function openFieldEdit(key){
+function openFieldEdit(key) {
   showPreview();
-  setTimeout(()=>{const inp=document.querySelector(`#preview-body .pf-value[data-key="${key}"]`);if(inp){inp.focus();inp.scrollIntoView({behavior:'smooth',block:'center'});}},400);
+  setTimeout(() => {
+    const inp = document.querySelector(`#preview-body .pf-value[data-key="${key}"]`);
+    if (inp) { inp.focus(); inp.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  }, 400);
 }
 
 // ══ SUBMIT ══
-async function submitReport(){
-  document.querySelectorAll('#preview-body .pf-value').forEach(inp=>{const key=inp.dataset.key,val=inp.value.trim();if(val)state.responses[key]=val;});
+// FIX #1 : submit utilise FormData (avec photos) — endpoint différent du chat JSON
+async function submitReport() {
+  document.querySelectorAll('#preview-body .pf-value').forEach(inp => {
+    const key = inp.dataset.key, val = inp.value.trim();
+    if (val) state.responses[key] = val;
+  });
   document.getElementById('modal-preview').classList.remove('visible');
-  document.getElementById('loading-text').textContent='Envoi du rapport...';
+  document.getElementById('loading-text').textContent = 'Envoi du rapport...';
   document.getElementById('loading').classList.add('visible');
-  try{
-    const fd=new FormData();
-    fd.append('data',JSON.stringify({session_id:state.session_id,sender_email:state.user?.email||'',sender_name:state.user?.name||'',responses:state.responses,source:'voice-agent-v2',action:'submit_report'}));
-    state.photoFiles.forEach((f,i)=>fd.append(`photo_${i+1}`,f,f.name));
-    const resp=await fetch(CONFIG.VOICE_URL,{method:'POST',body:fd});
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
+  try {
+    const fd = new FormData();
+    fd.append('data', JSON.stringify({
+      session_id: state.session_id,
+      sender_email: state.user?.email || '',
+      sender_name: state.user?.name || '',
+      responses: state.responses,
+      source: 'voice-agent-v2',
+      action: 'submit_report'
+    }));
+    state.photoFiles.forEach((f, i) => fd.append(`photo_${i + 1}`, f, f.name));
+    // NOTE : le même webhook n8n reçoit action='submit_report' pour distinguer
+    // le flow de soumission finale du flow de chat
+    const resp = await fetch(CONFIG.VOICE_URL, { method: 'POST', body: fd });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
     document.getElementById('loading').classList.remove('visible');
     showConfirmation();
-  }catch(e){document.getElementById('loading').classList.remove('visible');showToast('Erreur: '+e.message);}
+  } catch(e) {
+    document.getElementById('loading').classList.remove('visible');
+    showToast('Erreur : ' + e.message);
+  }
 }
-function showConfirmation(){
-  const r=state.responses;
-  document.getElementById('confirm-recap').innerHTML=`<strong>👷 ${state.user?.name||''}</strong><br>Client: <strong>${r.nom_client||'—'}</strong><br>Affaire: <strong>${r.numero_affaire||'—'}</strong><br>Type: <strong>${r.type_intervention||'—'}</strong><br>Terminé: <strong>${r.chantier_termine||'—'}</strong><br>Photos: <strong>${state.photoFiles.length}</strong>`;
+
+function showConfirmation() {
+  const r = state.responses;
+  document.getElementById('confirm-recap').innerHTML =
+    `<strong>👷 ${state.user?.name || ''}</strong><br>` +
+    `Client: <strong>${r.nom_client || '—'}</strong><br>` +
+    `Affaire: <strong>${r.numero_affaire || '—'}</strong><br>` +
+    `Type: <strong>${r.type_intervention || '—'}</strong><br>` +
+    `Terminé: <strong>${r.chantier_termine || '—'}</strong><br>` +
+    `Photos: <strong>${state.photoFiles.length}</strong>`;
   showScreen('confirmation');
 }
 
 // ══ INIT ══
-window.addEventListener('DOMContentLoaded',()=>{
-  dbg('DOM chargé');
-  document.getElementById('text-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendTextInput();}});
-  setTimeout(()=>{if(!window.google)document.getElementById('btn-fallback').style.display='flex';},4000);
-  const saved=loadUserSession();
-  if(saved){dbg('Session trouvée: '+saved.name);onUserAuthenticated(saved);}
-  else dbg('Pas de session — login requis');
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('text-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextInput(); }
+  });
+  setTimeout(() => { if (!window.google) document.getElementById('btn-fallback').style.display = 'flex'; }, 4000);
+  const saved = loadUserSession();
+  if (saved) onUserAuthenticated(saved);
 });
 </script>
 </body>
