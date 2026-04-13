@@ -432,6 +432,44 @@ let state={
 
 const SESSION_KEY='talco_user_session',SESSION_TTL=7*24*60*60*1000;
 
+// ══════════════════════════════════════════════════════════════════════════════
+// AUDIO UNLOCK — CRITIQUE POUR MOBILE
+// ══════════════════════════════════════════════════════════════════════════════
+let _audioUnlocked = false;
+let _audioContext = null;
+
+// Son silencieux base64 (MP3 très court)
+const SILENT_MP3 = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYNDkvOAAAAAAD/+xBkAA/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkKg/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==';
+
+async function unlockAudio() {
+  if (_audioUnlocked) return true;
+  
+  try {
+    // 1. Créer/reprendre l'AudioContext
+    if (!_audioContext) {
+      _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (_audioContext.state === 'suspended') {
+      await _audioContext.resume();
+    }
+    
+    // 2. Jouer un son silencieux pour débloquer la lecture audio
+    const audio = new Audio(SILENT_MP3);
+    audio.volume = 0.01;
+    await audio.play();
+    audio.pause();
+    
+    _audioUnlocked = true;
+    console.log('🔊 Audio débloqué avec succès');
+    return true;
+  } catch (e) {
+    console.warn('⚠️ Échec unlock audio:', e);
+    return false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+
 function saveUserSession(u){localStorage.setItem(SESSION_KEY,JSON.stringify({user:u,expires:Date.now()+SESSION_TTL}));}
 function loadUserSession(){try{const d=JSON.parse(localStorage.getItem(SESSION_KEY));if(!d||Date.now()>d.expires){localStorage.removeItem(SESSION_KEY);return null;}return d.user;}catch(e){return null;}}
 function handleGoogleCredential(r){
@@ -521,26 +559,32 @@ function addTyping(id){const feed=document.getElementById('feed-scroll');const d
 function removeTyping(id){document.getElementById(id)?.remove();}
 
 // ══ PUSH TO TALK ══
-// PTT state : on suit si le pointer est encore enfoncé
 let _pttActive = false;
 
 async function handlePTTStart(e){
-  e.preventDefault(); // empêche le scroll et le context menu mobile
+  e.preventDefault();
   if(state.isProcessing||state.isInitializing||state.isListening) return;
+  
   // Stopper l'audio en cours si le technicien appuie pendant que l'agent parle
   if(state.currentAudio){
     try{state.currentAudio.pause();}catch(err){}
     state.currentAudio=null;
     document.getElementById('walkie-btn').classList.remove('speaking');
   }
+  
   _pttActive=true;
   document.getElementById('walkie-btn').setPointerCapture(e.pointerId);
   await startRecording();
 }
 
-function handlePTTEnd(e){
+async function handlePTTEnd(e){
   if(!_pttActive) return;
   _pttActive=false;
+  
+  // ══ UNLOCK AUDIO AU RELÂCHEMENT DU PTT ══
+  // C'est le moment idéal car c'est une action utilisateur complète
+  await unlockAudio();
+  
   if(state.isListening) stopRecording();
 }
 
@@ -622,16 +666,29 @@ async function sendToAgent(audioBase64,textInput){
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LECTURE AUDIO — AVEC FALLBACK LOCAL → SERVEUR
+// ══════════════════════════════════════════════════════════════════════════════
+
 async function playAudio(base64, speech){
+  // S'assurer que l'audio est débloqué
+  await unlockAudio();
+  
   // 1. Essayer le fichier local préenregistré en priorité
   if(speech){
     const localUrl = _getLocalAudioUrl(speech);
     if(localUrl){
       const ok = await playLocalAudio(localUrl);
       if(ok !== false) return; // succès → on s'arrête là
+      console.log('⚠️ Audio local non trouvé, fallback TTS serveur');
     }
   }
+  
   // 2. Fallback : audio base64 du TTS serveur
+  return playBase64Audio(base64);
+}
+
+function playBase64Audio(base64) {
   return new Promise(resolve=>{
     if(!base64){resolve();return;}
     try{
@@ -641,11 +698,19 @@ async function playAudio(base64, speech){
       const blob=new Blob([bytes],{type:'audio/mpeg'});
       const url=URL.createObjectURL(blob);
       const audio=new Audio(url);
+      
       if(state.currentAudio){try{state.currentAudio.pause();}catch(e){}state.currentAudio=null;}
       state.currentAudio=audio;
       document.getElementById('walkie-btn').classList.add('speaking');
       updateMicStatus('TALCO-IA parle...');
-      const cleanup=()=>{URL.revokeObjectURL(url);state.currentAudio=null;document.getElementById('walkie-btn').classList.remove('speaking');};
+      
+      const cleanup=()=>{
+        URL.revokeObjectURL(url);
+        state.currentAudio=null;
+        document.getElementById('walkie-btn').classList.remove('speaking');
+        if(!state.is_complete) updateMicStatus('Maintiens pour parler');
+      };
+      
       audio.onended=()=>{cleanup();resolve();};
       audio.onerror=()=>{cleanup();resolve();};
       audio.play().catch(()=>{cleanup();resolve();});
@@ -655,8 +720,12 @@ async function playAudio(base64, speech){
 
 // Bouton "Commencer le rapport" — passe en mode vocal actif et lance l'init
 async function startReport(){
+  // Unlock audio au clic sur "Commencer"
+  await unlockAudio();
+  
   document.getElementById('mic-zone').classList.add('started');
   document.getElementById('feed-empty')?.remove();
+  
   // Lancer l'init seulement si pas encore fait
   if(state.history.length===0 && !state.isInitializing && !state.isProcessing){
     state.isInitializing=true;
@@ -666,7 +735,10 @@ async function startReport(){
 }
 
 // Bouton "Remplir à l'écrit" depuis l'état initial
-function startWritingMode(){
+async function startWritingMode(){
+  // Unlock audio au clic
+  await unlockAudio();
+  
   document.getElementById('mic-zone').classList.add('started');
   state.writingMode=true;
   document.getElementById('btn-writing-mode-active').classList.add('writing');
@@ -728,7 +800,6 @@ function buildWritingCards(){
         else delete state.responses[q.key];
         inp.classList.toggle('filled',!!inp.value);
         updateFieldsRecap();updateWritingProgress();
-        // Pas d'auto-avance sur mobile — le picker natif déclenche change trop tôt
       });
       card.appendChild(inp);
     } else if(q.type==='time'){
@@ -740,7 +811,6 @@ function buildWritingCards(){
         else delete state.responses[q.key];
         inp.classList.toggle('filled',!!inp.value);
         updateFieldsRecap();updateWritingProgress();
-        // Pas d'auto-avance sur mobile
       });
       card.appendChild(inp);
     } else {
@@ -825,7 +895,6 @@ function updateNavButtons(){
 
 // Écran de confirmation dans le panneau écrit
 function showWritingConfirm(){
-  // Lire les valeurs des inputs encore ouverts
   document.querySelectorAll('.writing-card').forEach((card,i)=>{
     const q=QUESTIONS[i];if(!q||q.type==='yesno')return;
     const inp=card.querySelector('.wc-input');if(!inp)return;
@@ -834,11 +903,9 @@ function showWritingConfirm(){
     else if(inp.value.trim())state.responses[q.key]=inp.value.trim();
   });
 
-  // Compter les champs remplis
   const filled=QUESTIONS.filter(q=>state.responses[q.key]).length;
   const total=QUESTIONS.length;
 
-  // Injecter un écran de confirmation dans le sheet
   const sheet=document.querySelector('.writing-sheet');
   const existing=document.getElementById('writing-confirm');
   if(existing)existing.remove();
@@ -847,7 +914,6 @@ function showWritingConfirm(){
   confirm.id='writing-confirm';
   confirm.style.cssText='position:absolute;inset:0;background:var(--s1);border-radius:22px 22px 0 0;display:flex;flex-direction:column;padding:24px 20px 20px;gap:16px;z-index:10;animation:slideUp .3s;';
 
-  // Score visuel
   const pct=Math.round(filled/total*100);
   const scoreColor=pct>=80?'var(--success)':pct>=50?'var(--gold)':'var(--danger)';
 
@@ -872,7 +938,6 @@ function showWritingConfirm(){
   sheet.style.position='relative';
   sheet.appendChild(confirm);
 
-  // Remplir la liste récap
   const list=confirm.querySelector('#wc-recap-list');
   QUESTIONS.forEach(q=>{
     const val=state.responses[q.key];
@@ -932,7 +997,7 @@ function onTouchEnd(){
   state.isSwiping=false;state.swipeDx=0;
 }
 
-// PHOTOS — compression Canvas avant stockage (max 1200px, qualité 0.82)
+// PHOTOS
 async function compressImage(file){
   return new Promise(resolve=>{
     const MAX=1200,QUALITY=0.82;
@@ -1014,34 +1079,11 @@ function showConfirmation(){
   showScreen('confirmation');
 }
 
-// ══ VOIX PRÉENREGISTRÉES ══
+// ══════════════════════════════════════════════════════════════════════════════
+// VOIX PRÉENREGISTRÉES — CORRIGÉ
+// ══════════════════════════════════════════════════════════════════════════════
 const VOICE_KEY = 'talco_voice';
-const VOICE_PHRASES = ['alloy','echo','fable','onyx','nova','shimmer'];
 let _selectedVoice = localStorage.getItem(VOICE_KEY) || 'onyx';
-
-// Map des phrases → fichier audio local
-const AUDIO_MAP = {
-  'init':                 'init',
-  'nom_client':           'nom_client',
-  'numero_affaire':       'numero_affaire',
-  'date_debut':           'date_debut',
-  'date_fin':             'date_fin',
-  'heure_debut':          'heure_debut',
-  'heure_fin':            'heure_fin',
-  'redacteur':            'redacteur',
-  'techniciens_presents': 'techniciens_presents',
-  'clients_presents':     'clients_presents',
-  'type_intervention':    'type_intervention',
-  'designation_precise':  'designation_precise',
-  'raison_intervention':  'raison_intervention',
-  'chantier_termine':     'chantier_termine',
-  'si_non_details':       'si_non_details',
-  'difficultes':          'difficultes',
-  'points_attention':     'points_attention',
-  'complet':              'complet',
-  'erreur':               'erreur',
-  'ok_court':             'ok_court',
-};
 
 // Textes exacts correspondant aux fichiers audio préenregistrés
 const PHRASE_TEXTS = {
@@ -1067,31 +1109,67 @@ const PHRASE_TEXTS = {
   "OK, noté.":                                             'ok_court',
 };
 
+// Cache pour vérifier si les fichiers existent (évite les 404 répétés)
+const _audioFileCache = {};
+
 function _getLocalAudioUrl(speech){
+  if (!speech) return null;
+  const trimmed = speech.trim();
+  
   // Cherche correspondance exacte
-  const key = PHRASE_TEXTS[speech?.trim()];
-  if(key) return `audio/${_selectedVoice}/${key}.mp3`;
+  const key = PHRASE_TEXTS[trimmed];
+  if(key) return `/audio/${_selectedVoice}/${key}.mp3`;
+  
   // Cherche correspondance partielle (l'agent peut légèrement varier)
   for(const [text, k] of Object.entries(PHRASE_TEXTS)){
-    if(speech && speech.includes(text.slice(0,20))) return `audio/${_selectedVoice}/${k}.mp3`;
+    if(trimmed.includes(text.slice(0,20))) return `/audio/${_selectedVoice}/${k}.mp3`;
   }
   return null;
 }
 
 async function playLocalAudio(url){
+  // Vérifier le cache
+  if (_audioFileCache[url] === false) {
+    return false; // Fichier déjà connu comme absent
+  }
+  
   return new Promise(resolve=>{
     const audio = new Audio(url);
-    if(state.currentAudio){try{state.currentAudio.pause();}catch(e){}state.currentAudio=null;}
+    
+    if(state.currentAudio){
+      try{state.currentAudio.pause();}catch(e){}
+      state.currentAudio=null;
+    }
     state.currentAudio = audio;
     document.getElementById('walkie-btn').classList.add('speaking');
     updateMicStatus('TALCO-IA parle...');
-    const cleanup=()=>{state.currentAudio=null;document.getElementById('walkie-btn').classList.remove('speaking');};
-    audio.onended=()=>{cleanup();resolve();};
-    audio.onerror=()=>{
-      // Fichier local absent → fallback TTS base64
-      cleanup();resolve(false);
+    
+    const cleanup=()=>{
+      state.currentAudio=null;
+      document.getElementById('walkie-btn').classList.remove('speaking');
+      if(!state.is_complete) updateMicStatus('Maintiens pour parler');
     };
-    audio.play().catch(()=>{cleanup();resolve(false);});
+    
+    audio.oncanplaythrough = () => {
+      _audioFileCache[url] = true; // Marquer comme existant
+    };
+    
+    audio.onended=()=>{cleanup();resolve(true);};
+    
+    audio.onerror=(e)=>{
+      // Fichier local absent → marquer dans le cache et signaler fallback
+      console.log(`⚠️ Audio local non trouvé: ${url}`);
+      _audioFileCache[url] = false;
+      cleanup();
+      resolve(false);
+    };
+    
+    audio.play().catch((e)=>{
+      console.log(`⚠️ Erreur lecture audio: ${e.message}`);
+      _audioFileCache[url] = false;
+      cleanup();
+      resolve(false);
+    });
   });
 }
 
@@ -1103,7 +1181,6 @@ function toggleVoiceDropdown(){
   dd.classList.toggle('open', !isOpen);
   btn.classList.toggle('open', !isOpen);
   if(!isOpen){
-    // Fermer en cliquant ailleurs
     setTimeout(()=>document.addEventListener('click', closeVoiceOnClick, {once:true}), 0);
   }
 }
@@ -1113,9 +1190,16 @@ function closeVoiceOnClick(e){
     document.getElementById('voice-btn').classList.remove('open');
   }
 }
-function selectVoice(voice){
+async function selectVoice(voice){
+  // Unlock audio au clic sur une voix
+  await unlockAudio();
+  
   _selectedVoice = voice;
   localStorage.setItem(VOICE_KEY, voice);
+  
+  // Vider le cache car on change de voix
+  Object.keys(_audioFileCache).forEach(k => delete _audioFileCache[k]);
+  
   // Update UI
   document.getElementById('voice-btn-label').textContent = voice.toUpperCase();
   document.querySelectorAll('.voice-option').forEach(el=>{
@@ -1125,13 +1209,18 @@ function selectVoice(voice){
   });
   document.getElementById('voice-dropdown').classList.remove('open');
   document.getElementById('voice-btn').classList.remove('open');
-  // Prévisualiser la voix
-  const previewUrl = `audio/${voice}/init.mp3`;
+  
+  // Prévisualiser la voix (chemin corrigé avec /)
+  const previewUrl = `/audio/${voice}/init.mp3`;
   const preview = new Audio(previewUrl);
   preview.volume = 0.7;
-  preview.play().catch(()=>{}); // silencieux si fichier absent
+  preview.play().catch(()=>{
+    console.log('Preview audio non disponible:', previewUrl);
+  });
+  
   showToast('Voix : ' + voice);
 }
+
 function initVoiceSelector(){
   document.getElementById('voice-btn-label').textContent = _selectedVoice.toUpperCase();
   document.querySelectorAll('.voice-option').forEach(el=>{
