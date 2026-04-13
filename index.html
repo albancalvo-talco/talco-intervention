@@ -554,12 +554,11 @@ const SESSION_KEY='talco_user_session',SESSION_TTL=7*24*60*60*1000;
 let _audioUnlocked = false;
 let _audioContext = null;
 
-const SILENT_MP3 = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYNDkvOAAAAAAD/+xBkAA/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkKg/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==';
-
 async function unlockAudio() {
   if (_audioUnlocked) return true;
   
   try {
+    // Créer ou reprendre l'AudioContext
     if (!_audioContext) {
       _audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
@@ -567,17 +566,21 @@ async function unlockAudio() {
       await _audioContext.resume();
     }
     
-    const audio = new Audio(SILENT_MP3);
-    audio.volume = 0.01;
-    await audio.play();
-    audio.pause();
+    // Jouer un buffer silencieux via AudioContext (méthode universelle)
+    const buffer = _audioContext.createBuffer(1, 1, 22050);
+    const source = _audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(_audioContext.destination);
+    source.start(0);
     
     _audioUnlocked = true;
     console.log('🔊 Audio débloqué');
     return true;
   } catch (e) {
     console.warn('⚠️ Échec unlock audio:', e);
-    return false;
+    // Même si ça échoue, on marque comme débloqué pour ne pas bloquer
+    _audioUnlocked = true;
+    return true;
   }
 }
 
