@@ -916,7 +916,80 @@ async function playAudio(base64, speech){
   return playBase64Audio(base64);
 }
 
-function playBase64Audio(base64) {
+let _audioUnlocked = false;
+let _audioContext = null;
+
+async function unlockAudio() {
+  if (_audioUnlocked) return;
+
+  try {
+    _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const buffer = _audioContext.createBuffer(1, 1, 22050);
+    const source = _audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(_audioContext.destination);
+    source.start(0);
+
+    _audioUnlocked = true;
+  } catch (e) {}
+}
+
+async function playAudio(base64) {
+  return new Promise(async resolve => {
+    if (!base64) {
+      resolve();
+      return;
+    }
+
+    try {
+      await unlockAudio();
+
+      const raw = base64
+        .replace(/^data:audio\/[^;]+;base64,/, '')
+        .replace(/\s+/g, '');
+
+      if (!raw) {
+        resolve();
+        return;
+      }
+
+      const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+
+      const audio = new Audio(url);
+
+      if (state.currentAudio) {
+        try { state.currentAudio.pause(); } catch (e) {}
+        state.currentAudio = null;
+      }
+
+      state.currentAudio = audio;
+
+      document.getElementById('walkie-btn').classList.add('speaking');
+      updateMicStatus('TALCO-IA parle...');
+
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        state.currentAudio = null;
+        document.getElementById('walkie-btn').classList.remove('speaking');
+        if (!state.is_complete) updateMicStatus('Maintiens pour parler');
+      };
+
+      audio.onended = () => { cleanup(); resolve(); };
+      audio.onerror = () => { cleanup(); resolve(); };
+
+      await audio.play().catch(() => {
+        cleanup();
+        resolve();
+      });
+
+    } catch (e) {
+      resolve();
+    }
+  });
+}
+
   return new Promise(resolve => {
     if(!base64){resolve();return;}
     try{
