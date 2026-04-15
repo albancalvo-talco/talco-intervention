@@ -806,17 +806,23 @@ async function sendToAgent(audioBase64, textInput) {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     
+    // Mettre à jour le state
     state.history = data.history || state.history;
     state.responses = {...state.responses, ...(data.responses || {})};
     state.is_complete = data.is_complete || false;
     
     updateQuestionDisplay();
-    
     if (state.writingMode) syncWritingPanelValues();
-    if (data.audio_base64) await playAudio(data.audio_base64);
-    if (state.is_complete) {
+    
+    // ══════════════════════════════════════════════════════════════
+    // JOUER L'AUDIO LOCAL BASÉ SUR next_field
+    // ══════════════════════════════════════════════════════════════
+    if (data.is_complete) {
+      await playLocalAudioForField('complet');
       updateMicStatus('Rapport complet ✓');
       showPreview();
+    } else if (data.next_field) {
+      await playLocalAudioForField(data.next_field);
     }
     
   } catch (e) {
@@ -827,69 +833,45 @@ async function sendToAgent(audioBase64, textInput) {
   } finally {
     state.isProcessing = false;
     document.getElementById('walkie-btn').classList.remove('processing', 'listening');
-    if (!state.is_complete && !document.getElementById('mic-status').textContent.startsWith('Erreur') && !document.getElementById('mic-status').textContent.startsWith('Rapport')) {
+    if (!state.is_complete) {
       updateMicStatus('Maintiens pour parler');
     }
     updateQuestionDisplay();
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// LECTURE AUDIO
-// ══════════════════════════════════════════════════════════════════════════════
-async function playAudio(base64) {
-  return new Promise(async resolve => {
-    if (!base64) {
-      resolve();
-      return;
+// ══════════════════════════════════════════════════════════════
+// JOUER L'AUDIO LOCAL POUR UN CHAMP
+// ══════════════════════════════════════════════════════════════
+async function playLocalAudioForField(fieldKey) {
+  const url = `/audio/${_selectedVoice}/${fieldKey}.mp3`;
+  
+  return new Promise(resolve => {
+    const audio = new Audio(url);
+    
+    if (state.currentAudio) {
+      try { state.currentAudio.pause(); } catch (e) {}
+      state.currentAudio = null;
     }
-
-    try {
-      await unlockAudio();
-
-      const raw = base64
-        .replace(/^data:audio\/[^;]+;base64,/, '')
-        .replace(/\s+/g, '');
-
-      if (!raw) {
-        resolve();
-        return;
-      }
-
-      const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
-      const blob = new Blob([bytes], {type: 'audio/mpeg'});
-      const url = URL.createObjectURL(blob);
-
-      const audio = new Audio(url);
-
-      if (state.currentAudio) {
-        try { state.currentAudio.pause(); } catch (e) {}
-        state.currentAudio = null;
-      }
-
-      state.currentAudio = audio;
-
-      document.getElementById('walkie-btn').classList.add('speaking');
-      updateMicStatus('TALCO-IA parle...');
-
-      const cleanup = () => {
-        URL.revokeObjectURL(url);
-        state.currentAudio = null;
-        document.getElementById('walkie-btn').classList.remove('speaking');
-        if (!state.is_complete) updateMicStatus('Maintiens pour parler');
-      };
-
-      audio.onended = () => { cleanup(); resolve(); };
-      audio.onerror = () => { cleanup(); resolve(); };
-
-      await audio.play().catch(() => {
-        cleanup();
-        resolve();
-      });
-
-    } catch (e) {
+    
+    state.currentAudio = audio;
+    document.getElementById('walkie-btn').classList.add('speaking');
+    updateMicStatus('TALCO-IA parle...');
+    
+    const cleanup = () => {
+      state.currentAudio = null;
+      document.getElementById('walkie-btn').classList.remove('speaking');
+      if (!state.is_complete) updateMicStatus('Maintiens pour parler');
       resolve();
-    }
+    };
+    
+    audio.onended = cleanup;
+    audio.onerror = () => {
+      console.warn('Audio local non trouvé:', url);
+      cleanup();
+    };
+    
+    audio.play().catch(() => cleanup());
   });
 }
 
@@ -904,6 +886,11 @@ async function startReport() {
   
   if (state.history.length === 0 && !state.isInitializing && !state.isProcessing) {
     state.isInitializing = true;
+    
+    // Jouer l'audio de bienvenue IMMÉDIATEMENT (pas besoin d'attendre le serveur)
+    await playLocalAudioForField('init');
+    
+    // Puis envoyer __init__ au serveur pour initialiser la session
     await sendToAgent(null, '__init__');
     state.isInitializing = false;
   }
