@@ -1503,6 +1503,9 @@ function removePhoto(i) {
 // PREVIEW & ENVOI
 // ══════════════════════════════════════════════════════════════════════════════
 function showPreview() {
+  // Fermer le panneau écrit s'il est ouvert
+  document.getElementById('writing-panel').classList.remove('open');
+  
   const body = document.getElementById('preview-body');
   body.innerHTML = '';
   QUESTIONS.forEach(q => {
@@ -1538,24 +1541,48 @@ async function submitReport() {
   document.getElementById('modal-preview').classList.remove('visible');
   document.getElementById('loading-text').textContent = 'Envoi du rapport...';
   document.getElementById('loading').classList.add('visible');
+  
   try {
-    const fd = new FormData();
-    fd.append('data', JSON.stringify({
+    const payload = {
       session_id: state.session_id,
       sender_email: state.user?.email || '',
       sender_name: state.user?.name || '',
       responses: state.responses,
       source: 'voice-agent-v2',
       action: 'submit_report'
-    }));
-    state.photoFiles.forEach((f, i) => fd.append(`photo_${i + 1}`, f, f.name));
-    const resp = await fetch(CONFIG.VOICE_URL, {method: 'POST', body: fd});
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    };
+    
+    let resp;
+    
+    if (state.photoFiles.length === 0) {
+      resp = await fetch(CONFIG.VOICE_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+    } else {
+      const fd = new FormData();
+      fd.append('data', JSON.stringify(payload));
+      state.photoFiles.forEach((f, i) => fd.append(`photo_${i + 1}`, f, f.name));
+      resp = await fetch(CONFIG.VOICE_URL, {method: 'POST', body: fd});
+    }
+    
     document.getElementById('loading').classList.remove('visible');
+    
+    if (!resp.ok) {
+      console.warn('HTTP error:', resp.status);
+      showToast('Attention : erreur serveur, mais rapport peut-être reçu');
+    }
+    
+    // Toujours afficher la confirmation
     showConfirmation();
+    
   } catch (e) {
+    console.error('Erreur envoi rapport:', e);
     document.getElementById('loading').classList.remove('visible');
-    showToast('Erreur : ' + e.message);
+    showToast('Erreur réseau : ' + e.message);
+    // Afficher quand même la confirmation
+    showConfirmation();
   }
 }
 
