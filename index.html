@@ -147,6 +147,15 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .yesno-btn:active{transform:scale(.97);}
 .yesno-btn.selected-oui{background:rgba(78,203,122,.15);border-color:rgba(78,203,122,.5);color:var(--success);}
 .yesno-btn.selected-non{background:rgba(224,82,82,.12);border-color:rgba(224,82,82,.4);color:var(--danger);}
+
+/* CHIPS TECHNICIENS */
+.tech-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+.tech-chip{padding:10px 16px;border-radius:100px;font-family:Inter,sans-serif;font-weight:500;font-size:14px;cursor:pointer;border:1.5px solid var(--border);background:var(--s2);color:var(--text);transition:all .2s;user-select:none;-webkit-user-select:none;}
+.tech-chip:active{transform:scale(.96);}
+.tech-chip.selected{background:rgba(232,169,0,.15);border-color:rgba(232,169,0,.6);color:var(--gold);}
+.tech-chip.multi-selected{background:rgba(78,203,122,.12);border-color:rgba(78,203,122,.5);color:var(--success);}
+.tech-chips-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:4px;letter-spacing:.06em;}
+
 .writing-nav{display:flex;align-items:center;gap:10px;padding:12px 20px 16px;flex-shrink:0;border-top:1px solid var(--border);}
 .wn-btn{flex:1;padding:14px;border-radius:12px;border:none;font-family:Syne,sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;}
 .wn-btn:active{transform:scale(.97);}
@@ -368,15 +377,27 @@ const CONFIG = {
   TIMEOUT_MS: 60000
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LISTE DES TECHNICIENS — MODIFIE ICI
+// ══════════════════════════════════════════════════════════════════════════════
+const TECHNICIENS = [
+  'Mathilde Clerc',
+  'Yonis Peres',
+  'Romain Desprez',
+  'Franck Sturm',
+  'Emillion Lemoine',
+  'Jean François Cuesta'
+];
+
 const QUESTIONS = [
   {key:'nom_client',         label:'Client',       text:"Nom du client ?",                      hint:"ex : Mairie de Montpellier",            cat:"identification",   type:'text'},
-  {key:'numero_affaire',     label:'Affaire',      text:"Numéro d'affaire ?",                   hint:"ex : 2025-042",                         cat:"identification",   type:'text'},
+  {key:'numero_affaire',     label:'Affaire',      text:"Numéro d'affaire ?",                   hint:"ex : 2025-042",                         cat:"identification",   type:'number'}, // MODIFIÉ
   {key:'date_debut',         label:'Début',        text:"Date de début ?",                      hint:"",                                      cat:"dates & horaires", type:'date'},
   {key:'date_fin',           label:'Fin',          text:"Date de fin ?",                        hint:"",                                      cat:"dates & horaires", type:'date'},
   {key:'heure_debut',        label:'H.début',      text:"Heure de début ?",                     hint:"",                                      cat:"dates & horaires", type:'time'},
   {key:'heure_fin',          label:'H.fin',        text:"Heure de fin ?",                       hint:"",                                      cat:"dates & horaires", type:'time'},
-  {key:'redacteur',          label:'Rédacteur',    text:"Ton prénom et nom ?",                  hint:"ex : Yonis Peres",                      cat:"équipe",           type:'text'},
-  {key:'techniciens_presents',label:'Techniciens', text:"Techniciens présents ?",               hint:"séparés par virgules",                  cat:"équipe",           type:'text'},
+  {key:'redacteur',          label:'Rédacteur',    text:"Qui rédige ce rapport ?",              hint:"Sélectionne ton nom",                   cat:"équipe",           type:'tech-single'},  // MODIFIÉ
+  {key:'techniciens_presents',label:'Techniciens', text:"Techniciens présents ?",               hint:"Sélectionne tous les présents",         cat:"équipe",           type:'tech-multi'},   // MODIFIÉ
   {key:'clients_presents',   label:'Clients site', text:"Clients présents sur site ?",          hint:"ou : Aucun",                            cat:"équipe",           type:'text'},
   {key:'type_intervention',  label:'Type',         text:"Type d'intervention ?",                hint:"Installation / Maintenance / Dépannage…",cat:"intervention",    type:'text'},
   {key:'designation_precise',label:'Description',  text:"Décris ce qui a été fait.",            hint:"",                                      cat:"intervention",     type:'textarea'},
@@ -925,7 +946,7 @@ function toggleWritingMode() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MODE ÉCRIT
+// MODE ÉCRIT — AVEC CHIPS TECHNICIENS
 // ══════════════════════════════════════════════════════════════════════════════
 function buildWritingCards() {
   const track = document.getElementById('writing-cards-track');
@@ -954,7 +975,79 @@ function buildWritingCards() {
     
     const val = state.responses[q.key] || '';
     
-    if (q.type === 'yesno') {
+    // ══════════════════════════════════════════════════════════════
+    // TYPE: SÉLECTION UNIQUE TECHNICIEN (rédacteur)
+    // ══════════════════════════════════════════════════════════════
+    if (q.type === 'tech-single') {
+      const chipsWrap = document.createElement('div');
+      chipsWrap.className = 'tech-chips';
+      chipsWrap.dataset.key = q.key;
+      
+      TECHNICIENS.forEach(tech => {
+        const chip = document.createElement('button');
+        chip.className = 'tech-chip';
+        chip.textContent = tech;
+        chip.dataset.val = tech;
+        if (val === tech) chip.classList.add('selected');
+        
+        chip.onclick = () => {
+          state.responses[q.key] = tech;
+          chipsWrap.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
+          chip.classList.add('selected');
+          updateQuestionDisplay();
+          updateWritingProgress();
+          // Auto-avance après sélection
+          setTimeout(() => writingNav(1), 300);
+        };
+        chipsWrap.appendChild(chip);
+      });
+      card.appendChild(chipsWrap);
+    }
+    // ══════════════════════════════════════════════════════════════
+    // TYPE: SÉLECTION MULTIPLE TECHNICIENS
+    // ══════════════════════════════════════════════════════════════
+    else if (q.type === 'tech-multi') {
+      const chipsWrap = document.createElement('div');
+      chipsWrap.className = 'tech-chips';
+      chipsWrap.dataset.key = q.key;
+      
+      // Parse les valeurs existantes (séparées par virgules)
+      const selectedTechs = val ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
+      
+      TECHNICIENS.forEach(tech => {
+        const chip = document.createElement('button');
+        chip.className = 'tech-chip';
+        chip.textContent = tech;
+        chip.dataset.val = tech;
+        if (selectedTechs.includes(tech)) chip.classList.add('multi-selected');
+        
+        chip.onclick = () => {
+          const currentSelected = (state.responses[q.key] || '').split(',').map(s => s.trim()).filter(Boolean);
+          const idx = currentSelected.indexOf(tech);
+          
+          if (idx >= 0) {
+            // Désélectionner
+            currentSelected.splice(idx, 1);
+            chip.classList.remove('multi-selected');
+          } else {
+            // Sélectionner
+            currentSelected.push(tech);
+            chip.classList.add('multi-selected');
+          }
+          
+          state.responses[q.key] = currentSelected.join(', ');
+          if (!state.responses[q.key]) delete state.responses[q.key];
+          updateQuestionDisplay();
+          updateWritingProgress();
+        };
+        chipsWrap.appendChild(chip);
+      });
+      card.appendChild(chipsWrap);
+    }
+    // ══════════════════════════════════════════════════════════════
+    // TYPE: OUI/NON
+    // ══════════════════════════════════════════════════════════════
+    else if (q.type === 'yesno') {
       const row = document.createElement('div');
       row.className = 'yesno-row';
       ['OUI', 'NON'].forEach(opt => {
@@ -974,7 +1067,11 @@ function buildWritingCards() {
         row.appendChild(b);
       });
       card.appendChild(row);
-    } else if (q.type === 'textarea') {
+    }
+    // ══════════════════════════════════════════════════════════════
+    // TYPE: TEXTAREA
+    // ══════════════════════════════════════════════════════════════
+    else if (q.type === 'textarea') {
       const ta = document.createElement('textarea');
       ta.className = 'wc-input wc-textarea' + (val ? ' filled' : '');
       ta.dataset.key = q.key;
@@ -988,7 +1085,11 @@ function buildWritingCards() {
         updateWritingProgress();
       });
       card.appendChild(ta);
-    } else if (q.type === 'date') {
+    }
+    // ══════════════════════════════════════════════════════════════
+    // TYPE: DATE
+    // ══════════════════════════════════════════════════════════════
+    else if (q.type === 'date') {
       const inp = document.createElement('input');
       inp.type = 'date';
       inp.className = 'wc-input' + (val ? ' filled' : '');
@@ -1010,7 +1111,11 @@ function buildWritingCards() {
         updateWritingProgress();
       });
       card.appendChild(inp);
-    } else if (q.type === 'time') {
+    }
+    // ══════════════════════════════════════════════════════════════
+    // TYPE: TIME
+    // ══════════════════════════════════════════════════════════════
+    else if (q.type === 'time') {
       const inp = document.createElement('input');
       inp.type = 'time';
       inp.className = 'wc-input' + (val ? ' filled' : '');
@@ -1024,7 +1129,35 @@ function buildWritingCards() {
         updateWritingProgress();
       });
       card.appendChild(inp);
-    } else {
+    }
+    // ══════════════════════════════════════════════════════════════
+    // TYPE: NUMBER (clavier numérique sur mobile)
+    // ══════════════════════════════════════════════════════════════
+    else if (q.type === 'number') {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.inputMode = 'numeric';  // Force le clavier numérique sur mobile
+      inp.pattern = '[0-9\\-]*';   // Accepte chiffres et tirets
+      inp.className = 'wc-input' + (val ? ' filled' : '');
+      inp.dataset.key = q.key;
+      inp.value = val;
+      inp.placeholder = q.hint || 'Votre réponse...';
+      inp.autocomplete = 'off';
+      inp.addEventListener('input', () => {
+        state.responses[q.key] = inp.value.trim();
+        inp.classList.toggle('filled', !!inp.value.trim());
+        updateQuestionDisplay();
+        updateWritingProgress();
+      });
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); writingNav(1); }
+      });
+      card.appendChild(inp);
+    }
+    // ══════════════════════════════════════════════════════════════
+    // TYPE: TEXT (défaut)
+    // ══════════════════════════════════════════════════════════════
+    else {
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.className = 'wc-input' + (val ? ' filled' : '');
@@ -1052,6 +1185,25 @@ function syncWritingPanelValues() {
     const q = QUESTIONS[i];
     if (!q) return;
     const val = state.responses[q.key] || '';
+    
+    // Sync chips tech-single
+    if (q.type === 'tech-single') {
+      card.querySelectorAll('.tech-chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.val === val);
+      });
+      return;
+    }
+    
+    // Sync chips tech-multi
+    if (q.type === 'tech-multi') {
+      const selectedTechs = val ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
+      card.querySelectorAll('.tech-chip').forEach(c => {
+        c.classList.toggle('multi-selected', selectedTechs.includes(c.dataset.val));
+      });
+      return;
+    }
+    
+    // Sync yesno
     if (q.type === 'yesno') {
       card.querySelectorAll('.yesno-btn').forEach(b => {
         b.className = 'yesno-btn';
@@ -1059,6 +1211,8 @@ function syncWritingPanelValues() {
       });
       return;
     }
+    
+    // Sync inputs
     const inp = card.querySelector('.wc-input');
     if (!inp) return;
     if (q.type === 'date') {
