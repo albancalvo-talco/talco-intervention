@@ -1008,9 +1008,15 @@ async function sendToAgent(audioBase64, textInput) {
   state.isWaitingForInput = true;
   document.getElementById('walkie-btn').classList.remove('processing', 'listening');
   
+  // ✅ BLOQUER l'audio si c'est l'appel __init__ OU pendant la phase init
+  if (textInput === '__init__' || state.isInitPhase) {
+    // Ne rien faire : pas d'audio, pas d'affichage
+    // L'affichage se fera après le clic "Commencer"
+    return;
+  }
+  
   // AFFICHER LA PROCHAINE QUESTION + JOUER SON AUDIO (après réponse)
-  // SAUF pendant la phase init OU si c'était l'appel __init__
-  if (!state.isInitPhase && !state.is_complete && data && data.next_field && textInput !== '__init__') {
+  if (!state.is_complete && data && data.next_field) {
     const nextField = data.next_field;
     const nextIdx = QUESTIONS.findIndex(q => q.key === nextField);
     if (nextIdx !== -1) {
