@@ -641,7 +641,6 @@ function updateQuestionDisplay() {
     chipsZone.style.display = 'flex';
     
     const currentSelected = [];
-    let selectedSingleValue = null;  // ← Pour tech-single
     
     TECHNICIENS.forEach(tech => {
       const chip = document.createElement('button');
@@ -650,10 +649,11 @@ function updateQuestionDisplay() {
       
       chip.onclick = async () => {
         if (q.type === 'tech-single') {
-          // Pour tech-single, juste sélectionner visuellement, pas envoyer immédiatement
+          state.responses[q.key] = tech;
           chipsZone.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
           chip.classList.add('selected');
-          selectedSingleValue = tech;  // ← Mémoriser le choix
+          
+          await sendToAgent(null, tech);
           
         } else {
           const idx = currentSelected.indexOf(tech);
@@ -669,23 +669,6 @@ function updateQuestionDisplay() {
       chipsZone.appendChild(chip);
     });
     
-    // Bouton de validation pour tech-single
-    if (q.type === 'tech-single') {
-      const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'confirm-multi-btn';
-      confirmBtn.textContent = 'Valider ✓';
-      confirmBtn.onclick = async () => {
-        if (!selectedSingleValue) {
-          showToast('Sélectionne un redacteur');
-          return;
-        }
-        state.responses[q.key] = selectedSingleValue;
-        await sendToAgent(null, selectedSingleValue);
-      };
-      chipsZone.appendChild(confirmBtn);
-    }
-    
-    // Bouton de validation pour tech-multi
     if (q.type === 'tech-multi') {
       const confirmBtn = document.createElement('button');
       confirmBtn.className = 'confirm-multi-btn';
@@ -776,14 +759,14 @@ function showStartButton() {
       document.getElementById('start-button-zone').style.display = 'none';
       document.getElementById('question-content').style.display = 'block';
       
-      // Afficher la première question et jouer son audio (toujours nom_client)
+      // Afficher la première question SANS audio
+      // L'audio se jouera après la première réponse (via le finally de sendToAgent)
       const firstQuestionField = 'nom_client';
       const firstIdx = QUESTIONS.findIndex(q => q.key === firstQuestionField);
       if (firstIdx !== -1) {
         state.currentQuestionIndex = firstIdx;
       }
       updateQuestionDisplay();
-      await playLocalAudioForField(firstQuestionField);
     };
     
     container.appendChild(text);
@@ -983,18 +966,16 @@ async function sendToAgent(audioBase64, textInput) {
     
     // ════════════════════════════════════════════════════════════════
     // AFFICHER LA PROCHAINE QUESTION + JOUER SON AUDIO (après réponse)
+    // Utiliser data.next_field du serveur (FIABLE)
     // ════════════════════════════════════════════════════════════════
-    if (!state.is_complete) {
-      // Trouve la première question non remplie
-      const nextField = QUESTIONS.find(q => !state.responses[q.key])?.key;
-      if (nextField) {
-        const nextIdx = QUESTIONS.findIndex(q => q.key === nextField);
-        if (nextIdx !== -1) {
-          state.currentQuestionIndex = nextIdx;
-        }
-        updateQuestionDisplay();
-        await playLocalAudioForField(nextField);
+    if (!state.is_complete && data && data.next_field) {
+      const nextField = data.next_field;
+      const nextIdx = QUESTIONS.findIndex(q => q.key === nextField);
+      if (nextIdx !== -1) {
+        state.currentQuestionIndex = nextIdx;
       }
+      updateQuestionDisplay();
+      await playLocalAudioForField(nextField);
     } else if (state.is_complete) {
       updateMicStatus('Rapport complet ✓');
       await playLocalAudioForField('complet');
