@@ -879,19 +879,18 @@ async function sendToAgent(audioBase64, textInput) {
     state.responses = {...state.responses, ...(data.responses || {})};
     state.is_complete = data.is_complete || false;
     
-    updateQuestionDisplay();
     if (state.writingMode) syncWritingPanelValues();
     
     // ════════════════════════════════════════════════════════════════
-    // FIX DÉCALAGE : Jouer l'audio LOCAL basé sur next_field du serveur
-    // Cet audio doit correspondre à la prochaine question (pas décalé)
+    // FIX : Afficher question AVANT de jouer audio
     // ════════════════════════════════════════════════════════════════
     if (data.is_complete) {
-      await playLocalAudioForField('complet');
       updateMicStatus('Rapport complet ✓');
+      await playLocalAudioForField('complet');
       showPreview();
     } else if (data.next_field) {
-      // data.next_field est le NOM du champ suivant (ex: 'nom_client', 'numero_affaire')
+      // Afficher la question AVANT de jouer l'audio
+      updateQuestionDisplay();
       await playLocalAudioForField(data.next_field);
     }
     
@@ -906,7 +905,6 @@ async function sendToAgent(audioBase64, textInput) {
     if (!state.is_complete) {
       updateMicStatus('Maintiens pour parler');
     }
-    updateQuestionDisplay();
   }
 }
 
