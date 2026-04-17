@@ -275,6 +275,10 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
     <!-- ZONE QUESTION CENTRALE -->
     <div class="question-zone" id="question-zone">      
       <!-- Contenu affiché une fois démarré -->
+      <!-- ZONE BOUTON "COMMENCER" -->
+      <div id="start-button-zone" style="display:none;width:100%;max-width:360px;"></div>
+      
+      <!-- ZONE QUESTIONS -->
       <div id="question-content" style="display:none;width:100%;max-width:360px;">
         <div class="progress-bar" id="progress-bar"></div>
         <div class="current-question" id="current-question">
@@ -713,8 +717,8 @@ function showQuestionContent() {
 }
 
 function showStartButton() {
-  // Afficher la zone d'abord
-  document.getElementById('question-content').style.display = 'block';
+  // Afficher la zone du bouton
+  document.getElementById('start-button-zone').style.display = 'block';
   
   // Créer le container du bouton s'il n'existe pas
   let startBtn = document.getElementById('start-questions-btn');
@@ -750,7 +754,9 @@ function showStartButton() {
     `;
     startBtn.textContent = 'Commencer';
     startBtn.onclick = async () => {
-      document.getElementById('start-button-container').remove();
+      // Masquer le bouton, afficher les questions
+      document.getElementById('start-button-zone').style.display = 'none';
+      document.getElementById('question-content').style.display = 'block';
       
       // Afficher la première question et jouer son audio
       if (state.history.length > 0) {
@@ -767,7 +773,7 @@ function showStartButton() {
     
     container.appendChild(text);
     container.appendChild(startBtn);
-    document.getElementById('question-content').appendChild(container);
+    document.getElementById('start-button-zone').appendChild(container);
   }
 }
 
