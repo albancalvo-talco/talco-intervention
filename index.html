@@ -641,6 +641,7 @@ function updateQuestionDisplay() {
     chipsZone.style.display = 'flex';
     
     const currentSelected = [];
+    let selectedSingleValue = null;  // ← Pour tech-single
     
     TECHNICIENS.forEach(tech => {
       const chip = document.createElement('button');
@@ -649,11 +650,10 @@ function updateQuestionDisplay() {
       
       chip.onclick = async () => {
         if (q.type === 'tech-single') {
-          state.responses[q.key] = tech;
+          // Pour tech-single, juste sélectionner visuellement, pas envoyer immédiatement
           chipsZone.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
           chip.classList.add('selected');
-          
-          await sendToAgent(null, tech);
+          selectedSingleValue = tech;  // ← Mémoriser le choix
           
         } else {
           const idx = currentSelected.indexOf(tech);
@@ -669,6 +669,23 @@ function updateQuestionDisplay() {
       chipsZone.appendChild(chip);
     });
     
+    // Bouton de validation pour tech-single
+    if (q.type === 'tech-single') {
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'confirm-multi-btn';
+      confirmBtn.textContent = 'Valider ✓';
+      confirmBtn.onclick = async () => {
+        if (!selectedSingleValue) {
+          showToast('Sélectionne un redacteur');
+          return;
+        }
+        state.responses[q.key] = selectedSingleValue;
+        await sendToAgent(null, selectedSingleValue);
+      };
+      chipsZone.appendChild(confirmBtn);
+    }
+    
+    // Bouton de validation pour tech-multi
     if (q.type === 'tech-multi') {
       const confirmBtn = document.createElement('button');
       confirmBtn.className = 'confirm-multi-btn';
@@ -967,7 +984,7 @@ async function sendToAgent(audioBase64, textInput) {
     // ════════════════════════════════════════════════════════════════
     // AFFICHER LA PROCHAINE QUESTION + JOUER SON AUDIO (après réponse)
     // ════════════════════════════════════════════════════════════════
-    if (!state.is_complete && state.history.length > 0) {
+    if (!state.is_complete) {
       // Trouve la première question non remplie
       const nextField = QUESTIONS.find(q => !state.responses[q.key])?.key;
       if (nextField) {
