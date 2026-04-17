@@ -883,14 +883,15 @@ async function sendToAgent(audioBase64, textInput) {
     if (state.writingMode) syncWritingPanelValues();
     
     // ════════════════════════════════════════════════════════════════
-    // FIX : Jouer l'audio LOCAL pour le next_field APRÈS réception du serveur
-    // (pas avant, ce qui causait la boucle vocale)
+    // FIX DÉCALAGE : Jouer l'audio LOCAL basé sur next_field du serveur
+    // Cet audio doit correspondre à la prochaine question (pas décalé)
     // ════════════════════════════════════════════════════════════════
     if (data.is_complete) {
       await playLocalAudioForField('complet');
       updateMicStatus('Rapport complet ✓');
       showPreview();
     } else if (data.next_field) {
+      // data.next_field est le NOM du champ suivant (ex: 'nom_client', 'numero_affaire')
       await playLocalAudioForField(data.next_field);
     }
     
@@ -955,11 +956,13 @@ async function startReport() {
   if (state.history.length === 0 && !state.isInitializing && !state.isProcessing) {
     state.isInitializing = true;
     
-    // Envoyer __init__ au serveur (pas de local audio avant réponse du serveur)
+    // FIX : Jouer l'audio init AVANT d'appeler le serveur
+    // Ca change rien au flux puisque le serveur repondra après et jouera son audio
+    await playLocalAudioForField('init');
+    
+    // Puis envoyer __init__ au serveur
     await sendToAgent(null, '__init__');
     state.isInitializing = false;
-    
-    // Une fois le serveur répond, il y aura playLocalAudioForField dans sendToAgent
   }
   
   // Masquer l'antenne une fois que la réponse est reçue
