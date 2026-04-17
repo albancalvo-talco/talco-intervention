@@ -313,11 +313,11 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
             </svg>
-            Commencer le rapport
+            Rapport Audio
           </button>
           <button class="btn-writing-mode" id="btn-writing-mode-start" onclick="startWritingMode()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Remplir à l'écrit
+            Rapport Écrit
           </button>
         </div>
       </div>
@@ -752,7 +752,8 @@ function showStartButton() {
       
       // Afficher la première question et jouer son audio
       if (state.history.length > 0) {
-        const firstQuestionField = state.responses.nom_client ? 'numero_affaire' : 'nom_client';
+        // Trouver la première question manquante
+        const firstQuestionField = QUESTIONS.find(q => !state.responses[q.key])?.key || 'nom_client';
         const firstIdx = QUESTIONS.findIndex(q => q.key === firstQuestionField);
         if (firstIdx !== -1) {
           state.currentQuestionIndex = firstIdx;
@@ -946,28 +947,8 @@ async function sendToAgent(audioBase64, textInput) {
     
     if (state.writingMode) syncWritingPanelValues();
     
-    // ════════════════════════════════════════════════════════════════
-    // FIX : Afficher la question que LE SERVEUR demande (next_field)
-    // SAUF si on est en phase init (on affiche juste le bouton "Commencer")
-    // ════════════════════════════════════════════════════════════════
-    if (state.isInitPhase) {
-      // Phase init : ne rien afficher, le bouton "Commencer" s'affichera dans startReport()
-      console.log('✅ Init réussie, bouton "Commencer" prêt');
-    } else if (data.is_complete) {
-      updateMicStatus('Rapport complet ✓');
-      await playLocalAudioForField('complet');
-      showPreview();
-    } else if (data.next_field) {
-      // Forcer le bon index basé sur data.next_field (pas sur les réponses)
-      const nextIdx = QUESTIONS.findIndex(q => q.key === data.next_field);
-      if (nextIdx !== -1) {
-        state.currentQuestionIndex = nextIdx;
-      }
-      // Afficher la question
-      updateQuestionDisplay();
-      // Puis jouer l'audio pour ce champ
-      await playLocalAudioForField(data.next_field);
-    }
+    // ⚠️ NE RIEN AFFICHER ICI - Juste mettre à jour state
+    // L'affichage et l'audio se font APRÈS que l'utilisateur clique/parle
     
   } catch (e) {
     hideTimeoutBar();
@@ -978,6 +959,27 @@ async function sendToAgent(audioBase64, textInput) {
     state.isProcessing = false;
     state.isWaitingForInput = true;  // ← Réactiver les inputs
     document.getElementById('walkie-btn').classList.remove('processing', 'listening');
+    
+    // ════════════════════════════════════════════════════════════════
+    // AFFICHER LA PROCHAINE QUESTION + JOUER SON AUDIO (après réponse)
+    // ════════════════════════════════════════════════════════════════
+    if (!state.is_complete && state.history.length > 0) {
+      // Trouve la première question non remplie
+      const nextField = QUESTIONS.find(q => !state.responses[q.key])?.key;
+      if (nextField) {
+        const nextIdx = QUESTIONS.findIndex(q => q.key === nextField);
+        if (nextIdx !== -1) {
+          state.currentQuestionIndex = nextIdx;
+        }
+        updateQuestionDisplay();
+        await playLocalAudioForField(nextField);
+      }
+    } else if (state.is_complete) {
+      updateMicStatus('Rapport complet ✓');
+      await playLocalAudioForField('complet');
+      showPreview();
+    }
+    
     if (!state.is_complete) {
       updateMicStatus('Maintiens pour parler');
     }
