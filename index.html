@@ -968,9 +968,9 @@ async function sendToAgent(audioBase64, textInput) {
     
     // ════════════════════════════════════════════════════════════════
     // AFFICHER LA PROCHAINE QUESTION + JOUER SON AUDIO (après réponse)
-    // Utiliser data.next_field du serveur (FIABLE)
+    // SAUF pendant la phase init (isInitPhase)
     // ════════════════════════════════════════════════════════════════
-    if (!state.is_complete && data && data.next_field) {
+    if (!state.isInitPhase && !state.is_complete && data && data.next_field) {
       const nextField = data.next_field;
       const nextIdx = QUESTIONS.findIndex(q => q.key === nextField);
       if (nextIdx !== -1) {
