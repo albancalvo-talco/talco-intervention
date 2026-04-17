@@ -446,6 +446,7 @@ let state = {
   isProcessing: false,
   isListening: false,
   isWaitingForInput: true,  // ← FLAG : attendre l'input avant d'envoyer
+  isInitPhase: false,  // ← FLAG : on est en train de faire init (skip affichage question)
   mediaRecorder: null,
   audioChunks: [],
   currentAudio: null,
@@ -745,9 +746,20 @@ function showStartButton() {
       font-weight: 700;
     `;
     startBtn.textContent = 'Commencer';
-    startBtn.onclick = () => {
+    startBtn.onclick = async () => {
       document.getElementById('start-button-container').remove();
       showQuestionContent();
+      
+      // Afficher la première question et jouer son audio
+      if (state.history.length > 0) {
+        const firstQuestionField = state.responses.nom_client ? 'numero_affaire' : 'nom_client';
+        const firstIdx = QUESTIONS.findIndex(q => q.key === firstQuestionField);
+        if (firstIdx !== -1) {
+          state.currentQuestionIndex = firstIdx;
+        }
+        updateQuestionDisplay();
+        await playLocalAudioForField(firstQuestionField);
+      }
     };
     
     container.appendChild(text);
@@ -936,8 +948,12 @@ async function sendToAgent(audioBase64, textInput) {
     
     // ════════════════════════════════════════════════════════════════
     // FIX : Afficher la question que LE SERVEUR demande (next_field)
+    // SAUF si on est en phase init (on affiche juste le bouton "Commencer")
     // ════════════════════════════════════════════════════════════════
-    if (data.is_complete) {
+    if (state.isInitPhase) {
+      // Phase init : ne rien afficher, le bouton "Commencer" s'affichera dans startReport()
+      console.log('✅ Init réussie, bouton "Commencer" prêt');
+    } else if (data.is_complete) {
       updateMicStatus('Rapport complet ✓');
       await playLocalAudioForField('complet');
       showPreview();
@@ -1013,6 +1029,7 @@ async function startReport() {
   
   if (state.history.length === 0 && !state.isInitializing && !state.isProcessing) {
     state.isInitializing = true;
+    state.isInitPhase = true;  // ← FLAG : on est en phase init
     
     // ════════════════════════════════════════════════════════════════
     // PARALLÉLISER : Jouer init.mp3 ET envoyer au serveur en même temps
@@ -1027,6 +1044,7 @@ async function startReport() {
     await Promise.all([initAudioPromise, serverPromise]);
     
     state.isInitializing = false;
+    state.isInitPhase = false;  // ← FLAG : init terminée
   }
   
   // Masquer l'antenne une fois que la réponse est reçue
