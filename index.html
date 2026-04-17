@@ -754,21 +754,19 @@ function showStartButton() {
     `;
     startBtn.textContent = 'Commencer';
     startBtn.onclick = async () => {
+      console.log('🔘 Clic Commencer');
       // Masquer le bouton, afficher les questions
       document.getElementById('start-button-zone').style.display = 'none';
       document.getElementById('question-content').style.display = 'block';
       
-      // Afficher la première question et jouer son audio
-      if (state.history.length > 0) {
-        // Trouver la première question manquante
-        const firstQuestionField = QUESTIONS.find(q => !state.responses[q.key])?.key || 'nom_client';
-        const firstIdx = QUESTIONS.findIndex(q => q.key === firstQuestionField);
-        if (firstIdx !== -1) {
-          state.currentQuestionIndex = firstIdx;
-        }
-        updateQuestionDisplay();
-        await playLocalAudioForField(firstQuestionField);
+      // Afficher la première question et jouer son audio (toujours nom_client)
+      const firstQuestionField = 'nom_client';
+      const firstIdx = QUESTIONS.findIndex(q => q.key === firstQuestionField);
+      if (firstIdx !== -1) {
+        state.currentQuestionIndex = firstIdx;
       }
+      updateQuestionDisplay();
+      await playLocalAudioForField(firstQuestionField);
     };
     
     container.appendChild(text);
