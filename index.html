@@ -890,10 +890,18 @@ async function startRecording() {
     return;
   }
   
-  // ✅ BLOQUER l'envoi auto pour Q7 et Q8 (chips techniciens)
+  // ✅ GUARD GLOBAL : bloquer si sendToAgent déjà en cours
+  if (state.isProcessing) {
+    console.warn('⚠️ mediaRecorder.onstop ignoré : sendToAgent déjà en cours');
+    updateMicStatus('Maintiens pour parler');
+    document.getElementById('walkie-btn').classList.remove('listening', 'processing');
+    return;
+  }
+  
+  // ✅ BLOQUER envoi auto pour Q7 et Q8
   const currentQ = QUESTIONS[state.currentQuestionIndex];
   if (currentQ && (currentQ.type === 'tech-single' || currentQ.type === 'tech-multi')) {
-    console.log('⚠️ Question avec chips, ignorer l\'audio micro');
+    console.log('⚠️ Question avec chips, ignorer audio micro');
     updateMicStatus('Maintiens pour parler');
     document.getElementById('walkie-btn').classList.remove('listening', 'processing');
     return;
@@ -905,6 +913,7 @@ async function startRecording() {
     r.onerror = rej;
     r.readAsDataURL(blob);
   });
+  
   sendToAgent(b64, null);
 };
     
