@@ -73,8 +73,8 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 
 /* SÉLECTEUR VOIX */
 .voice-selector{position:relative;display:flex;align-items:center;}
-.voice-btn{display:flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--border);border-radius:100px;padding:5px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);cursor:pointer;transition:all .2s;letter-spacing:.06em;}
-.voice-btn:active,.voice-btn.open{border-color:rgba(232,169,0,.4);color:var(--gold);}
+.voice-btn{display:flex;align-items:center;gap:5px;background:var(--s2);border:2px solid var(--gold);border-radius:100px;padding:8px 12px;font-family:'Syne',sans-serif;font-size:10px;color:var(--gold);cursor:pointer;transition:all .2s;letter-spacing:.06em;font-weight:600;}
+.voice-btn:active,.voice-btn.open{border-color:var(--gold);background:rgba(232,169,0,.15);color:var(--gold);}
 .voice-btn svg{width:11px;height:11px;flex-shrink:0;}
 .voice-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;z-index:300;min-width:210px;box-shadow:0 8px 32px rgba(0,0,0,.5);opacity:0;pointer-events:none;transform:translateY(-6px);transition:all .2s cubic-bezier(.4,0,.2,1);}
 .voice-dropdown.open{opacity:1;pointer-events:all;transform:translateY(0);}
@@ -259,12 +259,8 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
           <span id="voice-btn-label">VOIX</span>
         </button>
         <div class="voice-dropdown" id="voice-dropdown">
-          <div class="voice-option" data-voice="alloy"   onclick="selectVoice('alloy')">  <div class="vo-name" id="vo-alloy">Alloy</div>  <div class="vo-desc">Neutre · mixte équilibrée</div></div>
-          <div class="voice-option" data-voice="echo"    onclick="selectVoice('echo')">   <div class="vo-name" id="vo-echo">Echo</div>    <div class="vo-desc">Masculine · ton professionnel</div></div>
-          <div class="voice-option" data-voice="fable"   onclick="selectVoice('fable')">  <div class="vo-name" id="vo-fable">Fable</div>  <div class="vo-desc">Expressive · ton narratif</div></div>
           <div class="voice-option" data-voice="onyx"    onclick="selectVoice('onyx')">   <div class="vo-name" id="vo-onyx">Onyx</div>    <div class="vo-desc">Grave · idéale terrain</div></div>
           <div class="voice-option" data-voice="nova"    onclick="selectVoice('nova')">   <div class="vo-name" id="vo-nova">Nova</div>    <div class="vo-desc">Féminine · ton énergique</div></div>
-          <div class="voice-option" data-voice="shimmer" onclick="selectVoice('shimmer')"><div class="vo-name" id="vo-shimmer">Shimmer</div><div class="vo-desc">Féminine · ton doux</div></div>
         </div>
       </div>
       <button class="btn-new" onclick="newSession()">NOUVEAU</button>
@@ -435,6 +431,28 @@ const QUESTIONS = [
 ];
 
 const FIELD_ORDER = QUESTIONS.map(q => q.key);
+
+// MAPPING: noms de champs (du serveur) → noms de fichiers audio
+const AUDIO_FILE_MAP = {
+  'nom_client': 'nom_client',
+  'numero_affaire': 'numero_affaire',
+  'date_debut': 'date_debut',
+  'date_fin': 'date_fin',
+  'heure_debut': 'heure_debut',
+  'heure_fin': 'heure_fin',
+  'redacteur': 'redacteur',
+  'techniciens_presents': 'techniciens_presents',
+  'clients_presents': 'clients_presents',
+  'type_intervention': 'type_intervention',
+  'designation_precise': 'designation_precise',
+  'raison_intervention': 'raison_intervention',
+  'chantier_termine': 'chantier_termine',
+  'si_non_details': 'si_non_details',
+  'difficultes': 'difficultes',
+  'points_attention': 'points_attention',
+  'init': 'init',
+  'complet': 'complete'
+};
 
 let state = {
   user: null,
@@ -917,14 +935,17 @@ async function sendToAgent(audioBase64, textInput) {
 }
 
 async function playLocalAudioForField(fieldKey) {
+  // Utiliser le mapping pour obtenir le nom de fichier audio correct
+  const audioFileName = AUDIO_FILE_MAP[fieldKey] || fieldKey;
+  
   // FIX : Chemin correct pour GitHub Pages (/talco-intervention/audio/...)
   const baseUrl = window.location.pathname.includes('talco-intervention') 
     ? '/talco-intervention/audio' 
     : './audio';
-  const url = `${baseUrl}/${_selectedVoice}/${fieldKey}.mp3`;
+  const url = `${baseUrl}/${_selectedVoice}/${audioFileName}.mp3`;
   
   // DEBUG LOG
-  console.log('🎵 Tentative de jouer audio pour:', fieldKey, 'URL:', url);
+  console.log('🎵 Jouer audio pour champ:', fieldKey, '→ fichier:', audioFileName, 'URL:', url);
   
   return new Promise(resolve => {
     const audio = new Audio(url);
@@ -946,16 +967,16 @@ async function playLocalAudioForField(fieldKey) {
     };
     
     audio.onended = () => {
-      console.log('✅ Audio terminé:', fieldKey);
+      console.log('✅ Audio terminé:', audioFileName);
       cleanup();
     };
     audio.onerror = (err) => {
-      console.warn('❌ Audio ERREUR pour', fieldKey, ':', err);
+      console.warn('❌ Audio ERREUR pour', audioFileName, ':', err);
       cleanup();
     };
     
     audio.play().catch(err => {
-      console.error('❌ play() failed:', fieldKey, err);
+      console.error('❌ play() failed:', audioFileName, err);
       cleanup();
     });
   });
@@ -968,23 +989,25 @@ async function startReport() {
   await unlockAudio();
   
   document.getElementById('mic-zone').classList.add('started');
-  
-  // Afficher l'antenne pendant la connexion
   document.getElementById('connection-state').classList.add('visible');
   
   if (state.history.length === 0 && !state.isInitializing && !state.isProcessing) {
     state.isInitializing = true;
     
-    // FIX : Jouer l'audio init AVANT d'appeler le serveur
-    // Ca change rien au flux puisque le serveur repondra après et jouera son audio
+    // Jouer init.mp3 pour dire bonjour
+    console.log('🎯 Étape 1: Jouer init.mp3');
     await playLocalAudioForField('init');
     
-    // Puis envoyer __init__ au serveur
+    // Attendre un peu avant d'appeler le serveur
+    await new Promise(r => setTimeout(r, 500));
+    
+    // Envoyer __init__ au serveur
+    console.log('🎯 Étape 2: Appeler serveur avec __init__');
     await sendToAgent(null, '__init__');
+    
     state.isInitializing = false;
   }
   
-  // Masquer l'antenne une fois que la réponse est reçue
   document.getElementById('connection-state').classList.remove('visible');
   showQuestionContent();
 }
