@@ -882,15 +882,21 @@ async function sendToAgent(audioBase64, textInput) {
     if (state.writingMode) syncWritingPanelValues();
     
     // ════════════════════════════════════════════════════════════════
-    // FIX : Afficher question AVANT de jouer audio
+    // FIX : Afficher la question que LE SERVEUR demande (next_field)
     // ════════════════════════════════════════════════════════════════
     if (data.is_complete) {
       updateMicStatus('Rapport complet ✓');
       await playLocalAudioForField('complet');
       showPreview();
     } else if (data.next_field) {
-      // Afficher la question AVANT de jouer l'audio
+      // Forcer le bon index basé sur data.next_field (pas sur les réponses)
+      const nextIdx = QUESTIONS.findIndex(q => q.key === data.next_field);
+      if (nextIdx !== -1) {
+        state.currentQuestionIndex = nextIdx;
+      }
+      // Afficher la question
       updateQuestionDisplay();
+      // Puis jouer l'audio pour ce champ
       await playLocalAudioForField(data.next_field);
     }
     
