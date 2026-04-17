@@ -638,76 +638,70 @@ function updateQuestionDisplay() {
   chipsZone.innerHTML = '';
   
   if ((q.type === 'tech-single' || q.type === 'tech-multi') && !state.responses[q.key]) {
-    chipsZone.style.display = 'flex';
+  chipsZone.style.display = 'flex';
+  
+  TECHNICIENS.forEach(tech => {
+    const chip = document.createElement('button');
+    chip.className = 'tech-chip';
+    chip.textContent = tech;
     
-    TECHNICIENS.forEach(tech => {
-      const chip = document.createElement('button');
-      chip.className = 'tech-chip';
-      chip.textContent = tech;
-      
-      // ✅ Pré-sélectionner les chips déjà choisis (mode multi)
-      if (q.type === 'tech-multi') {
-        const currentSelected = state.responses[q.key] 
-          ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
-          : [];
-        if (currentSelected.includes(tech)) {
-          chip.classList.add('multi-selected');
-        }
-      }
-      
-      chip.onclick = async () => {
-        if (q.type === 'tech-single') {
-          state.responses[q.key] = tech;
-          chipsZone.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
-          chip.classList.add('selected');
-          await sendToAgent(null, tech);
-          
-        } else {
-          // Mode multi : toggle la sélection
-          const currentSelected = state.responses[q.key] 
-            ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
-            : [];
-          
-          const idx = currentSelected.indexOf(tech);
-          if (idx >= 0) {
-            currentSelected.splice(idx, 1);
-          } else {
-            currentSelected.push(tech);
-          }
-          
-          // ✅ Mettre à jour state.responses IMMÉDIATEMENT
-          state.responses[q.key] = currentSelected.join(', ');
-          if (!state.responses[q.key]) delete state.responses[q.key];
-          
-          // ✅ Réafficher pour mettre à jour les chips
-          updateQuestionDisplay();
-        }
-      };
-      chipsZone.appendChild(chip);
-    });
+    // Pré-sélectionner les chips déjà choisis
+    const currentSelected = state.responses[q.key] 
+      ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
+      : [];
     
-    if (q.type === 'tech-multi') {
-      const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'confirm-multi-btn';
-      confirmBtn.textContent = 'Valider la sélection ✓';
-      confirmBtn.onclick = async () => {
-        const currentSelected = state.responses[q.key] 
-          ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
-          : [];
-        
-        if (currentSelected.length === 0) {
-          showToast('Sélectionne au moins un technicien');
-          return;
-        }
-        
-        await sendToAgent(null, state.responses[q.key]);
-      };
-      chipsZone.appendChild(confirmBtn);
+    if (q.type === 'tech-single' && state.responses[q.key] === tech) {
+      chip.classList.add('selected');
+    }
+    if (q.type === 'tech-multi' && currentSelected.includes(tech)) {
+      chip.classList.add('multi-selected');
     }
     
-  } else {
-    chipsZone.style.display = 'none';
-  }
+    chip.onclick = () => {
+      if (q.type === 'tech-single') {
+        // Mode single : sélectionner UN seul (mais ne PAS envoyer)
+        state.responses[q.key] = tech;
+        chipsZone.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        
+      } else {
+        // Mode multi : toggle la sélection
+        const currentSelected = state.responses[q.key] 
+          ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
+          : [];
+        
+        const idx = currentSelected.indexOf(tech);
+        if (idx >= 0) {
+          currentSelected.splice(idx, 1);
+          chip.classList.remove('multi-selected');
+        } else {
+          currentSelected.push(tech);
+          chip.classList.add('multi-selected');
+        }
+        
+        state.responses[q.key] = currentSelected.join(', ');
+        if (!state.responses[q.key]) delete state.responses[q.key];
+      }
+    };
+    chipsZone.appendChild(chip);
+  });
+  
+  // ✅ BOUTON VALIDER POUR LES DEUX TYPES (single ET multi)
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'confirm-multi-btn';
+  confirmBtn.textContent = 'Valider ✓';
+  confirmBtn.onclick = async () => {
+    if (!state.responses[q.key] || state.responses[q.key].trim() === '') {
+      showToast('Sélectionne au moins une personne');
+      return;
+    }
+    await sendToAgent(null, state.responses[q.key]);
+  };
+  chipsZone.appendChild(confirmBtn);
+  
+} else {
+  chipsZone.style.display = 'none';
+}
   
   const answerEl = document.getElementById('q-answer');
   if (state.responses[q.key]) {
