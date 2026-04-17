@@ -713,6 +713,9 @@ function showQuestionContent() {
 }
 
 function showStartButton() {
+  // Afficher la zone d'abord
+  document.getElementById('question-content').style.display = 'block';
+  
   // Créer le container du bouton s'il n'existe pas
   let startBtn = document.getElementById('start-questions-btn');
   if (!startBtn) {
@@ -748,7 +751,6 @@ function showStartButton() {
     startBtn.textContent = 'Commencer';
     startBtn.onclick = async () => {
       document.getElementById('start-button-container').remove();
-      document.getElementById('question-content').style.display = 'block';  // ← Afficher MAINTENANT
       
       // Afficher la première question et jouer son audio
       if (state.history.length > 0) {
@@ -767,9 +769,6 @@ function showStartButton() {
     container.appendChild(startBtn);
     document.getElementById('question-content').appendChild(container);
   }
-  
-  // ⚠️ NE PAS afficher question-content ici
-  // Elle s'affichera SEULEMENT quand on clique "Commencer"
 }
 
 function showTimeoutBar(ms) {
