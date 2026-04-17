@@ -640,13 +640,18 @@ function updateQuestionDisplay() {
   if ((q.type === 'tech-single' || q.type === 'tech-multi') && !state.responses[q.key]) {
     chipsZone.style.display = 'flex';
     
-    const currentSelected = [];
+    const currentSelected = state.responses[q.key] 
+   ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
+   : [];
     
     TECHNICIENS.forEach(tech => {
       const chip = document.createElement('button');
       chip.className = 'tech-chip';
       chip.textContent = tech;
-      
+
+      if (q.type === 'tech-multi' && currentSelected.includes(tech)) {
+    chip.classList.add('multi-selected');
+  } 
       chip.onclick = async () => {
         if (q.type === 'tech-single') {
           state.responses[q.key] = tech;
