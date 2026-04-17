@@ -432,8 +432,9 @@ const QUESTIONS = [
 
 const FIELD_ORDER = QUESTIONS.map(q => q.key);
 
-// MAPPING: noms de champs (du serveur) → noms de fichiers audio
+// MAPPING: noms de champs (du serveur) → noms de fichiers audio EXACTS
 const AUDIO_FILE_MAP = {
+  // Questions principales
   'nom_client': 'nom_client',
   'numero_affaire': 'numero_affaire',
   'date_debut': 'date_debut',
@@ -450,8 +451,12 @@ const AUDIO_FILE_MAP = {
   'si_non_details': 'si_non_details',
   'difficultes': 'difficultes',
   'points_attention': 'points_attention',
+  
+  // Spécial
   'init': 'init',
-  'complet': 'complete'
+  'complet': 'complete',
+  'ok_court': 'ok_court',
+  'erreur': 'erreur'
 };
 
 let state = {
@@ -1019,11 +1024,27 @@ async function sendToAgent(audioBase64, textInput) {
       await playLocalAudioForField('complet');
       updateMicStatus('Rapport complet ✓');
       showPreview();
+    // ════════════════════════════════════════════════════════════════
+    // FIX : Jouer l'audio LOCAL basé sur next_field du serveur
+    // SAUF si c'est la première question (nom_client) car init.mp3 a déjà été joué
+    // ════════════════════════════════════════════════════════════════
+    if (data.is_complete) {
+      await playLocalAudioForField('complet');
+      updateMicStatus('Rapport complet ✓');
+      showPreview();
     } else if (data.next_field) {
-      // Simplification : faire confiance au serveur
-      // Jouer l'audio pour le next_field qu'il envoie
-      console.log('🎵 Jouer audio pour:', data.next_field);
-      await playLocalAudioForField(data.next_field);
+      // FIX : Ne pas rejuer l'audio s'il s'agit de la première question
+      // car init.mp3 a déjà été joué dans startReport()
+      const isFirstQuestion = !state.history || state.history.length === 0;
+      
+      if (isFirstQuestion && data.next_field === 'nom_client') {
+        console.log('⏭️ Première question détectée, audio init déjà joué, skip audio nom_client');
+        // Ne pas jouer l'audio, juste mettre à jour l'affichage
+      } else {
+        // Jouer l'audio pour les autres questions
+        console.log('🎵 Jouer audio pour:', data.next_field);
+        await playLocalAudioForField(data.next_field);
+      }
     }
     
   } catch (e) {
@@ -1042,8 +1063,13 @@ async function sendToAgent(audioBase64, textInput) {
 }
 
 async function playLocalAudioForField(fieldKey) {
-  // Utiliser le mapping pour obtenir le nom de fichier audio correct
-  const audioFileName = AUDIO_FILE_MAP[fieldKey] || fieldKey;
+  // Utiliser le mapping pour obtenir le nom EXACT du fichier audio
+  const audioFileName = AUDIO_FILE_MAP[fieldKey];
+  
+  if (!audioFileName) {
+    console.warn('❌ Pas de mapping pour:', fieldKey);
+    return;
+  }
   
   // FIX : Chemin correct pour GitHub Pages (/talco-intervention/audio/...)
   const baseUrl = window.location.pathname.includes('talco-intervention') 
@@ -1051,8 +1077,7 @@ async function playLocalAudioForField(fieldKey) {
     : './audio';
   const url = `${baseUrl}/${_selectedVoice}/${audioFileName}.mp3`;
   
-  // DEBUG LOG
-  console.log('🎵 Jouer audio pour champ:', fieldKey, '→ fichier:', audioFileName, 'URL:', url);
+  console.log('🎵 Jouer audio:', fieldKey, '→', audioFileName, 'URL:', url);
   
   return new Promise(resolve => {
     const audio = new Audio(url);
@@ -1078,12 +1103,12 @@ async function playLocalAudioForField(fieldKey) {
       cleanup();
     };
     audio.onerror = (err) => {
-      console.warn('❌ Audio ERREUR pour', audioFileName, ':', err);
+      console.error('❌ Audio ERREUR pour', audioFileName, '- URL:', url, 'Erreur:', err);
       cleanup();
     };
     
     audio.play().catch(err => {
-      console.error('❌ play() failed:', audioFileName, err);
+      console.error('❌ play() failed pour', audioFileName, err);
       cleanup();
     });
   });
