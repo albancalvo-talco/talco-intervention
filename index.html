@@ -665,7 +665,7 @@ function updateQuestionDisplay() {
         chip.classList.add('selected');
         
       } else {
-        // Mode multi : toggle la sélection
+        // Mode multi : toggle la sélection SANS recréer les chips
         const currentSelected = state.responses[q.key] 
           ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
           : [];
@@ -681,6 +681,9 @@ function updateQuestionDisplay() {
         
         state.responses[q.key] = currentSelected.join(', ');
         if (!state.responses[q.key]) delete state.responses[q.key];
+        
+        // ✅ NE PAS appeler updateQuestionDisplay() ici
+        // Juste mettre à jour le state, les chips restent visibles
       }
     };
     chipsZone.appendChild(chip);
