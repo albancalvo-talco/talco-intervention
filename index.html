@@ -60,10 +60,6 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .q-answer.pending{background:rgba(232,169,0,.08);border-color:rgba(232,169,0,.25);color:var(--gold);}
 .q-answer.pending::before{content:'⏳';}
 
-/* Message quand pas encore commencé */
-.question-placeholder{color:var(--text3);font-size:14px;text-align:center;line-height:1.6;}
-.question-placeholder strong{color:var(--gold);}
-
 /* Compteur de progression */
 .progress-counter{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);margin-top:16px;letter-spacing:.08em;}
 .progress-counter span{color:var(--gold);font-weight:600;}
@@ -98,9 +94,9 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 .btn-start:active{transform:scale(.97);box-shadow:0 2px 12px rgba(232,169,0,.15);}
 .btn-start svg{width:20px;height:20px;flex-shrink:0;}
 
-/* Bouton écrit - MÊME TAILLE que btn-start */
-.btn-writing-mode{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:18px 24px;background:transparent;border:1.5px solid var(--border);border-radius:16px;font-family:Syne,sans-serif;font-size:16px;font-weight:800;color:var(--text2);letter-spacing:-.01em;cursor:pointer;transition:all .2s;}
-.btn-writing-mode:active{transform:scale(.97);border-color:var(--gold);color:var(--gold);}
+/* Bouton écrit - MÊME TAILLE que btn-start, mais avec meilleure visibilité */
+.btn-writing-mode{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:18px 24px;background:rgba(232,169,0,.15);border:2px solid var(--gold);border-radius:16px;font-family:Syne,sans-serif;font-size:16px;font-weight:800;color:var(--gold);letter-spacing:-.01em;cursor:pointer;transition:all .2s;}
+.btn-writing-mode:active{transform:scale(.97);background:rgba(232,169,0,.25);border-color:var(--gold);}
 .btn-writing-mode.writing{border-color:rgba(232,169,0,.4);background:rgba(232,169,0,.08);color:var(--gold);}
 .btn-writing-mode svg{width:20px;height:20px;flex-shrink:0;}
 
@@ -277,11 +273,7 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
   
   <div class="main-body">
     <!-- ZONE QUESTION CENTRALE -->
-    <div class="question-zone" id="question-zone">
-      <div class="question-placeholder" id="question-placeholder">
-        Appuie sur <strong>Commencer le rapport</strong><br>ou <strong>Remplir à l'écrit</strong>
-      </div>
-      
+    <div class="question-zone" id="question-zone">      
       <!-- Contenu affiché une fois démarré -->
       <div id="question-content" style="display:none;width:100%;max-width:360px;">
         <div class="progress-bar" id="progress-bar"></div>
@@ -579,7 +571,6 @@ function startSession() {
   
   closeWritingPanel();
   document.getElementById('mic-zone').classList.remove('started');
-  document.getElementById('question-placeholder').style.display = 'block';
   document.getElementById('question-content').style.display = 'none';
   document.getElementById('connection-state').classList.remove('visible');
   document.getElementById('walkie-btn').className = 'walkie-btn';
@@ -715,7 +706,6 @@ function updateQuestionDisplay() {
 }
 
 function showQuestionContent() {
-  document.getElementById('question-placeholder').style.display = 'none';
   document.getElementById('question-content').style.display = 'block';
   updateQuestionDisplay();
 }
@@ -961,8 +951,6 @@ async function startReport() {
   
   // Afficher l'antenne pendant la connexion
   document.getElementById('connection-state').classList.add('visible');
-  document.getElementById('question-placeholder').style.display = 'none';
-  document.getElementById('question-content').style.display = 'none';
   
   if (state.history.length === 0 && !state.isInitializing && !state.isProcessing) {
     state.isInitializing = true;
