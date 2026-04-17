@@ -661,6 +661,7 @@ function updateQuestionDisplay() {
       
       chip.onclick = async () => {
         if (q.type === 'tech-single') {
+          // Sélection unique → envoie direct au backend
           state.responses[q.key] = tech;
           chipsZone.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
           chip.classList.add('selected');
@@ -668,6 +669,7 @@ function updateQuestionDisplay() {
           await sendToAgent(null, tech);
           
         } else {
+          // Multi-sélection → toggle + afficher le bouton valider
           const idx = currentSelected.indexOf(tech);
           if (idx >= 0) {
             currentSelected.splice(idx, 1);
@@ -676,15 +678,24 @@ function updateQuestionDisplay() {
             currentSelected.push(tech);
             chip.classList.add('multi-selected');
           }
+          
+          // Mettre à jour la visibilité du bouton valider
+          const confirmBtn = document.getElementById('confirm-multi-btn-tech');
+          if (confirmBtn) {
+            confirmBtn.style.display = currentSelected.length > 0 ? 'block' : 'none';
+          }
         }
       };
       chipsZone.appendChild(chip);
     });
     
+    // Bouton de confirmation pour multi-sélection
     if (q.type === 'tech-multi') {
       const confirmBtn = document.createElement('button');
+      confirmBtn.id = 'confirm-multi-btn-tech';
       confirmBtn.className = 'confirm-multi-btn';
       confirmBtn.textContent = 'Valider la sélection ✓';
+      confirmBtn.style.display = 'none'; // Caché au départ
       confirmBtn.onclick = async () => {
         if (currentSelected.length === 0) {
           showToast('Sélectionne au moins un technicien');
@@ -692,6 +703,8 @@ function updateQuestionDisplay() {
         }
         const value = currentSelected.join(', ');
         state.responses[q.key] = value;
+        
+        // Envoyer au backend
         await sendToAgent(null, value);
       };
       chipsZone.appendChild(confirmBtn);
@@ -712,6 +725,100 @@ function updateQuestionDisplay() {
     answerEl.style.display = 'flex';
   } else {
     answerEl.style.display = 'none';
+  }
+  
+  // ════════════════════════════════════════════════════════════════
+  // SPECIAL : Afficher pop-up OUI/NON pour la question chantier_termine
+  // ════════════════════════════════════════════════════════════════
+  if (q.key === 'chantier_termine' && !state.responses[q.key]) {
+    // Masquer la zone chips et afficher un pop-up OUI/NON
+    chipsZone.style.display = 'none';
+    answerEl.style.display = 'none';
+    
+    const popupContainer = document.createElement('div');
+    popupContainer.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(10,10,10,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+    `;
+    
+    const popupBox = document.createElement('div');
+    popupBox.style.cssText = `
+      background: var(--s1);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 28px 24px;
+      max-width: 340px;
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    `;
+    
+    const title = document.createElement('div');
+    title.style.cssText = `
+      font-family: Syne, sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+    `;
+    title.textContent = q.text;
+    popupBox.appendChild(title);
+    
+    const buttonsRow = document.createElement('div');
+    buttonsRow.style.cssText = `
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    `;
+    
+    ['OUI', 'NON'].forEach(opt => {
+      const btn = document.createElement('button');
+      btn.style.cssText = `
+        flex: 1;
+        padding: 14px 20px;
+        border-radius: 12px;
+        border: none;
+        font-family: Syne, sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all .2s;
+      `;
+      
+      if (opt === 'OUI') {
+        btn.style.cssText += `
+          background: var(--gold);
+          color: #111;
+        `;
+      } else {
+        btn.style.cssText += `
+          background: var(--danger);
+          color: #fff;
+        `;
+      }
+      
+      btn.textContent = opt;
+      btn.onclick = async () => {
+        state.responses[q.key] = opt;
+        popupContainer.remove();
+        updateQuestionDisplay();
+        
+        // Envoyer la réponse au serveur
+        await sendToAgent(null, opt);
+      };
+      
+      buttonsRow.appendChild(btn);
+    });
+    
+    popupBox.appendChild(buttonsRow);
+    popupContainer.appendChild(popupBox);
+    document.body.appendChild(popupContainer);
   }
   
   document.getElementById('progress-counter').innerHTML = 
@@ -895,7 +1002,7 @@ async function sendToAgent(audioBase64, textInput) {
     
     console.log('📨 Réponse serveur:', {
       next_field: data.next_field,
-      responses: data.responses,
+      responses: Object.keys(data.responses || {}),
       is_complete: data.is_complete
     });
     
@@ -903,20 +1010,45 @@ async function sendToAgent(audioBase64, textInput) {
     state.responses = {...state.responses, ...(data.responses || {})};
     state.is_complete = data.is_complete || false;
     
+    // Log après mise à jour
+    const currentIdx = QUESTIONS.findIndex(q => !state.responses[q.key]);
+    console.log('📊 État après réponse serveur:', {
+      currentQuestionIndex: state.currentQuestionIndex,
+      calculatedIndex: currentIdx,
+      nextFieldFromServer: data.next_field,
+      allResponses: Object.keys(state.responses)
+    });
+    state.responses = {...state.responses, ...(data.responses || {})};
+    state.is_complete = data.is_complete || false;
+    
     updateQuestionDisplay();
     if (state.writingMode) syncWritingPanelValues();
     
     // ════════════════════════════════════════════════════════════════
-    // FIX DÉCALAGE : Jouer l'audio LOCAL basé sur next_field du serveur
-    // Cet audio doit correspondre à la prochaine question (pas décalé)
+    // FIX : Jouer l'audio LOCAL basé sur next_field du serveur
+    // MAIS : vérifier qu'on a réellement changé de question avant de jouer
     // ════════════════════════════════════════════════════════════════
     if (data.is_complete) {
       await playLocalAudioForField('complet');
       updateMicStatus('Rapport complet ✓');
       showPreview();
     } else if (data.next_field) {
-      // data.next_field est le NOM du champ suivant (ex: 'nom_client', 'numero_affaire')
-      await playLocalAudioForField(data.next_field);
+      // Vérifier qu'on a réellement changé de question avant de jouer l'audio
+      const currentQuestion = QUESTIONS[state.currentQuestionIndex];
+      const nextQuestion = QUESTIONS.find(q => q.key === data.next_field);
+      
+      if (currentQuestion && nextQuestion && currentQuestion.key !== data.next_field) {
+        // On a changé de question, jouer l'audio
+        console.log('🎯 Changement question:', currentQuestion.key, '→', data.next_field);
+        await playLocalAudioForField(data.next_field);
+      } else if (!currentQuestion) {
+        // Première question, jouer l'audio
+        console.log('🎯 Première question:', data.next_field);
+        await playLocalAudioForField(data.next_field);
+      } else {
+        // Pas de changement ou question non trouvée
+        console.log('⚠️ Pas de changement détecté. Actuellement:', currentQuestion?.key, 'Serveur:', data.next_field);
+      }
     }
     
   } catch (e) {
