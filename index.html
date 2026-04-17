@@ -569,6 +569,7 @@ function startSession() {
   state.photoFiles = [];
   state.photoUrls = [];
   state.currentQuestionIndex = 0;
+  state.lastSendTime = 0;
   
   if (state.currentAudio) {
     try { state.currentAudio.pause(); } catch (e) {}
@@ -924,11 +925,23 @@ function stopRecording() {
 // FIX PRINCIPAL : Flux audio corrigé
 // ════════════════════════════════════════════════════════════════
 async function sendToAgent(audioBase64, textInput) {
-  if (state.isProcessing) return;
+  // ✅ Guard anti-boucle : bloquer si déjà en cours
+  if (state.isProcessing) {
+    console.warn('⚠️ sendToAgent déjà en cours, ignorer cet appel');
+    return;
+  }
   if (!state.isWaitingForInput) {
     console.log('⏳ En attente de réponse du serveur, ignorer input');
     return;
   }
+  
+  // ✅ Guard anti-double appel rapide
+  const now = Date.now();
+  if (state.lastSendTime && (now - state.lastSendTime) < 500) {
+    console.warn('⚠️ Appel trop rapide, ignorer (moins de 500ms depuis le dernier)');
+    return;
+  }
+  state.lastSendTime = now;
   state.isProcessing = true;
   state.isWaitingForInput = false;  // ← Bloquer les inputs suivants
   document.getElementById('walkie-btn').classList.add('processing');
