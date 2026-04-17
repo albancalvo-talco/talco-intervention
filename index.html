@@ -881,23 +881,32 @@ async function startRecording() {
       if (e.data.size > 0) state.audioChunks.push(e.data);
     };
     state.mediaRecorder.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(state.audioChunks, {type: mimeType});
-      
-      if (blob.size < 1000) {
-        updateMicStatus('Maintiens pour parler');
-        document.getElementById('walkie-btn').classList.remove('listening', 'processing');
-        return;
-      }
-      
-      const b64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result.replace(/^data:audio\/[^;]+;base64,/, '').replace(/\s+/g, ''));
-        r.onerror = rej;
-        r.readAsDataURL(blob);
-      });
-      sendToAgent(b64, null);
-    };
+  stream.getTracks().forEach(t => t.stop());
+  const blob = new Blob(state.audioChunks, {type: mimeType});
+  
+  if (blob.size < 1000) {
+    updateMicStatus('Maintiens pour parler');
+    document.getElementById('walkie-btn').classList.remove('listening', 'processing');
+    return;
+  }
+  
+  // ✅ BLOQUER l'envoi auto pour Q7 et Q8 (chips techniciens)
+  const currentQ = QUESTIONS[state.currentQuestionIndex];
+  if (currentQ && (currentQ.type === 'tech-single' || currentQ.type === 'tech-multi')) {
+    console.log('⚠️ Question avec chips, ignorer l\'audio micro');
+    updateMicStatus('Maintiens pour parler');
+    document.getElementById('walkie-btn').classList.remove('listening', 'processing');
+    return;
+  }
+  
+  const b64 = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.replace(/^data:audio\/[^;]+;base64,/, '').replace(/\s+/g, ''));
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+  sendToAgent(b64, null);
+};
     
     state.mediaRecorder.start();
     state.isListening = true;
