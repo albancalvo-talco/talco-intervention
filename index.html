@@ -875,6 +875,12 @@ async function sendToAgent(audioBase64, textInput) {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     
+    console.log('📨 Réponse serveur:', {
+      next_field: data.next_field,
+      responses: data.responses,
+      is_complete: data.is_complete
+    });
+    
     state.history = data.history || state.history;
     state.responses = {...state.responses, ...(data.responses || {})};
     state.is_complete = data.is_complete || false;
@@ -911,7 +917,14 @@ async function sendToAgent(audioBase64, textInput) {
 }
 
 async function playLocalAudioForField(fieldKey) {
-  const url = `./audio/${_selectedVoice}/${fieldKey}.mp3`;
+  // FIX : Chemin correct pour GitHub Pages (/talco-intervention/audio/...)
+  const baseUrl = window.location.pathname.includes('talco-intervention') 
+    ? '/talco-intervention/audio' 
+    : './audio';
+  const url = `${baseUrl}/${_selectedVoice}/${fieldKey}.mp3`;
+  
+  // DEBUG LOG
+  console.log('🎵 Tentative de jouer audio pour:', fieldKey, 'URL:', url);
   
   return new Promise(resolve => {
     const audio = new Audio(url);
@@ -932,13 +945,19 @@ async function playLocalAudioForField(fieldKey) {
       resolve();
     };
     
-    audio.onended = cleanup;
-    audio.onerror = () => {
-      console.warn('Audio local non trouvé:', url);
+    audio.onended = () => {
+      console.log('✅ Audio terminé:', fieldKey);
+      cleanup();
+    };
+    audio.onerror = (err) => {
+      console.warn('❌ Audio ERREUR pour', fieldKey, ':', err);
       cleanup();
     };
     
-    audio.play().catch(() => cleanup());
+    audio.play().catch(err => {
+      console.error('❌ play() failed:', fieldKey, err);
+      cleanup();
+    });
   });
 }
 
