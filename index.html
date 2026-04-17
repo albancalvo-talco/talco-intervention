@@ -711,6 +711,53 @@ function showQuestionContent() {
   updateQuestionDisplay();
 }
 
+function showStartButton() {
+  // Créer le container du bouton s'il n'existe pas
+  let startBtn = document.getElementById('start-questions-btn');
+  if (!startBtn) {
+    const container = document.createElement('div');
+    container.id = 'start-button-container';
+    container.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 60px 24px;
+      min-height: 60vh;
+    `;
+    
+    const text = document.createElement('p');
+    text.style.cssText = `
+      font-size: 16px;
+      color: var(--text2);
+      text-align: center;
+      max-width: 300px;
+    `;
+    text.textContent = 'Prêt à commencer les questions ?';
+    
+    startBtn = document.createElement('button');
+    startBtn.id = 'start-questions-btn';
+    startBtn.className = 'btn-start';
+    startBtn.style.cssText = `
+      padding: 16px 40px;
+      font-size: 16px;
+      font-weight: 700;
+    `;
+    startBtn.textContent = 'Commencer';
+    startBtn.onclick = () => {
+      document.getElementById('start-button-container').remove();
+      showQuestionContent();
+    };
+    
+    container.appendChild(text);
+    container.appendChild(startBtn);
+    document.getElementById('question-content').appendChild(container);
+  }
+  
+  document.getElementById('question-content').style.display = 'block';
+}
+
 function showTimeoutBar(ms) {
   const wrap = document.getElementById('timeout-bar-wrap');
   const bar = document.getElementById('timeout-bar');
@@ -967,18 +1014,28 @@ async function startReport() {
   if (state.history.length === 0 && !state.isInitializing && !state.isProcessing) {
     state.isInitializing = true;
     
-    // FIX : Jouer l'audio init AVANT d'appeler le serveur
-    // Ca change rien au flux puisque le serveur repondra après et jouera son audio
-    await playLocalAudioForField('init');
+    // ════════════════════════════════════════════════════════════════
+    // PARALLÉLISER : Jouer init.mp3 ET envoyer au serveur en même temps
+    // La barre de chargement sera couverte par l'audio init
+    // ════════════════════════════════════════════════════════════════
     
-    // Puis envoyer __init__ au serveur
-    await sendToAgent(null, '__init__');
+    // Lancer les deux en parallèle (pas await sequential)
+    const initAudioPromise = playLocalAudioForField('init');
+    const serverPromise = sendToAgent(null, '__init__');
+    
+    // Attendre que les deux finissent
+    await Promise.all([initAudioPromise, serverPromise]);
+    
     state.isInitializing = false;
   }
   
   // Masquer l'antenne une fois que la réponse est reçue
   document.getElementById('connection-state').classList.remove('visible');
-  showQuestionContent();
+  
+  // ════════════════════════════════════════════════════════════════
+  // Afficher le bouton "Commencer" au lieu de la question directement
+  // ════════════════════════════════════════════════════════════════
+  showStartButton();
 }
 
 async function startWritingMode() {
