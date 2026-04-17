@@ -445,6 +445,7 @@ let state = {
   isInitializing: false,
   isProcessing: false,
   isListening: false,
+  isWaitingForInput: true,  // ← FLAG : attendre l'input avant d'envoyer
   mediaRecorder: null,
   audioChunks: [],
   currentAudio: null,
@@ -842,7 +843,12 @@ function stopRecording() {
 // ════════════════════════════════════════════════════════════════
 async function sendToAgent(audioBase64, textInput) {
   if (state.isProcessing) return;
+  if (!state.isWaitingForInput) {
+    console.log('⏳ En attente de réponse du serveur, ignorer input');
+    return;
+  }
   state.isProcessing = true;
+  state.isWaitingForInput = false;  // ← Bloquer les inputs suivants
   document.getElementById('walkie-btn').classList.add('processing');
   updateMicStatus('Envoi...');
   updateQuestionDisplay();
@@ -907,6 +913,7 @@ async function sendToAgent(audioBase64, textInput) {
     updateMicStatus('Erreur — réessaie');
   } finally {
     state.isProcessing = false;
+    state.isWaitingForInput = true;  // ← Réactiver les inputs
     document.getElementById('walkie-btn').classList.remove('processing', 'listening');
     if (!state.is_complete) {
       updateMicStatus('Maintiens pour parler');
