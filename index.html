@@ -640,35 +640,47 @@ function updateQuestionDisplay() {
   if ((q.type === 'tech-single' || q.type === 'tech-multi') && !state.responses[q.key]) {
     chipsZone.style.display = 'flex';
     
-    const currentSelected = state.responses[q.key] 
-   ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
-   : [];
-    
     TECHNICIENS.forEach(tech => {
       const chip = document.createElement('button');
       chip.className = 'tech-chip';
       chip.textContent = tech;
-
-      if (q.type === 'tech-multi' && currentSelected.includes(tech)) {
-    chip.classList.add('multi-selected');
-  } 
+      
+      // ✅ Pré-sélectionner les chips déjà choisis (mode multi)
+      if (q.type === 'tech-multi') {
+        const currentSelected = state.responses[q.key] 
+          ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
+          : [];
+        if (currentSelected.includes(tech)) {
+          chip.classList.add('multi-selected');
+        }
+      }
+      
       chip.onclick = async () => {
         if (q.type === 'tech-single') {
           state.responses[q.key] = tech;
           chipsZone.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
           chip.classList.add('selected');
-          
           await sendToAgent(null, tech);
           
         } else {
+          // Mode multi : toggle la sélection
+          const currentSelected = state.responses[q.key] 
+            ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
+            : [];
+          
           const idx = currentSelected.indexOf(tech);
           if (idx >= 0) {
             currentSelected.splice(idx, 1);
-            chip.classList.remove('multi-selected');
           } else {
             currentSelected.push(tech);
-            chip.classList.add('multi-selected');
           }
+          
+          // ✅ Mettre à jour state.responses IMMÉDIATEMENT
+          state.responses[q.key] = currentSelected.join(', ');
+          if (!state.responses[q.key]) delete state.responses[q.key];
+          
+          // ✅ Réafficher pour mettre à jour les chips
+          updateQuestionDisplay();
         }
       };
       chipsZone.appendChild(chip);
@@ -679,13 +691,16 @@ function updateQuestionDisplay() {
       confirmBtn.className = 'confirm-multi-btn';
       confirmBtn.textContent = 'Valider la sélection ✓';
       confirmBtn.onclick = async () => {
+        const currentSelected = state.responses[q.key] 
+          ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
+          : [];
+        
         if (currentSelected.length === 0) {
           showToast('Sélectionne au moins un technicien');
           return;
         }
-        const value = currentSelected.join(', ');
-        state.responses[q.key] = value;
-        await sendToAgent(null, value);
+        
+        await sendToAgent(null, state.responses[q.key]);
       };
       chipsZone.appendChild(confirmBtn);
     }
@@ -968,32 +983,31 @@ async function sendToAgent(audioBase64, textInput) {
     showToast('Erreur : ' + msg);
     updateMicStatus('Erreur — réessaie');
   } finally {
-    state.isProcessing = false;
-    state.isWaitingForInput = true;  // ← Réactiver les inputs
-    document.getElementById('walkie-btn').classList.remove('processing', 'listening');
-    
-    // ════════════════════════════════════════════════════════════════
-    // AFFICHER LA PROCHAINE QUESTION + JOUER SON AUDIO (après réponse)
-    // SAUF pendant la phase init (isInitPhase)
-    // ════════════════════════════════════════════════════════════════
-    if (!state.isInitPhase && !state.is_complete && data && data.next_field) {
-      const nextField = data.next_field;
-      const nextIdx = QUESTIONS.findIndex(q => q.key === nextField);
-      if (nextIdx !== -1) {
-        state.currentQuestionIndex = nextIdx;
-      }
-      updateQuestionDisplay();
-      await playLocalAudioForField(nextField);
-    } else if (state.is_complete) {
-      updateMicStatus('Rapport complet ✓');
-      await playLocalAudioForField('complet');
-      showPreview();
+  state.isProcessing = false;
+  state.isWaitingForInput = true;
+  document.getElementById('walkie-btn').classList.remove('processing', 'listening');
+  
+  // AFFICHER LA PROCHAINE QUESTION + JOUER SON AUDIO (après réponse)
+  // SAUF pendant la phase init OU si c'était l'appel __init__
+  if (!state.isInitPhase && !state.is_complete && data && data.next_field && textInput !== '__init__') {
+    const nextField = data.next_field;
+    const nextIdx = QUESTIONS.findIndex(q => q.key === nextField);
+    if (nextIdx !== -1) {
+      state.currentQuestionIndex = nextIdx;
     }
-    
-    if (!state.is_complete) {
-      updateMicStatus('Maintiens pour parler');
-    }
+    updateQuestionDisplay();
+    await playLocalAudioForField(nextField);
+  } else if (state.is_complete) {
+    updateMicStatus('Rapport complet ✓');
+    await playLocalAudioForField('complet');
+    showPreview();
   }
+  
+  if (!state.is_complete) {
+    updateMicStatus('Maintiens pour parler');
+  }
+}
+
 }
 
 async function playLocalAudioForField(fieldKey) {
