@@ -1000,24 +1000,11 @@ async function sendToAgent(audioBase64, textInput) {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     
-    console.log('📨 Réponse serveur:', {
-      next_field: data.next_field,
-      responses: Object.keys(data.responses || {}),
-      is_complete: data.is_complete
-    });
+    console.log('📨 Réponse serveur - next_field:', data.next_field, 'is_complete:', data.is_complete);
     
     state.history = data.history || state.history;
     state.responses = {...state.responses, ...(data.responses || {})};
     state.is_complete = data.is_complete || false;
-    
-    // Log après mise à jour
-    const currentIdx = QUESTIONS.findIndex(q => !state.responses[q.key]);
-    console.log('📊 État après réponse serveur:', {
-      currentQuestionIndex: state.currentQuestionIndex,
-      calculatedIndex: currentIdx,
-      nextFieldFromServer: data.next_field,
-      allResponses: Object.keys(state.responses)
-    });
     state.responses = {...state.responses, ...(data.responses || {})};
     state.is_complete = data.is_complete || false;
     
@@ -1033,22 +1020,10 @@ async function sendToAgent(audioBase64, textInput) {
       updateMicStatus('Rapport complet ✓');
       showPreview();
     } else if (data.next_field) {
-      // Vérifier qu'on a réellement changé de question avant de jouer l'audio
-      const currentQuestion = QUESTIONS[state.currentQuestionIndex];
-      const nextQuestion = QUESTIONS.find(q => q.key === data.next_field);
-      
-      if (currentQuestion && nextQuestion && currentQuestion.key !== data.next_field) {
-        // On a changé de question, jouer l'audio
-        console.log('🎯 Changement question:', currentQuestion.key, '→', data.next_field);
-        await playLocalAudioForField(data.next_field);
-      } else if (!currentQuestion) {
-        // Première question, jouer l'audio
-        console.log('🎯 Première question:', data.next_field);
-        await playLocalAudioForField(data.next_field);
-      } else {
-        // Pas de changement ou question non trouvée
-        console.log('⚠️ Pas de changement détecté. Actuellement:', currentQuestion?.key, 'Serveur:', data.next_field);
-      }
+      // Simplification : faire confiance au serveur
+      // Jouer l'audio pour le next_field qu'il envoie
+      console.log('🎵 Jouer audio pour:', data.next_field);
+      await playLocalAudioForField(data.next_field);
     }
     
   } catch (e) {
