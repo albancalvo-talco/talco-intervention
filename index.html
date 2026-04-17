@@ -919,6 +919,8 @@ async function sendToAgent(audioBase64, textInput) {
   
   showTimeoutBar(CONFIG.TIMEOUT_MS);
   
+  let data = null;  // ← DÉCLARER data ICI pour l'utiliser dans le finally
+  
   try {
     const payload = {
       session_id: state.session_id,
@@ -943,7 +945,7 @@ async function sendToAgent(audioBase64, textInput) {
     hideTimeoutBar();
     
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
+    data = await resp.json();
     
     state.history = data.history || state.history;
     state.responses = {...state.responses, ...(data.responses || {})};
