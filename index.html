@@ -767,7 +767,8 @@ function showStartButton() {
         state.currentQuestionIndex = firstIdx;
       }
       updateQuestionDisplay();
-    };
+      await playLocalAudioForField('nom_client');
+   };
     
     container.appendChild(text);
     container.appendChild(startBtn);
