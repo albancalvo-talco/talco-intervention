@@ -948,7 +948,7 @@ async function sendToAgent(audioBase64, textInput) {
   
   // ✅ Guard anti-double appel rapide
   const now = Date.now();
-  if (state.lastSendTime && (now - state.lastSendTime) < 500) {
+  if (state.lastSendTime && (now - state.lastSendTime) < 2000) {
     console.warn('⚠️ Appel trop rapide, ignorer (moins de 500ms depuis le dernier)');
     return;
   }
