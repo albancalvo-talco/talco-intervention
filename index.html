@@ -394,7 +394,9 @@ body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:
 <div class="loading-overlay" id="loading"><div class="spinner"></div><div class="loading-text" id="loading-text">Envoi...</div></div>
 
 <script>
-// CONFIG & STATE identiques à l'original, SAUF le flux audio
+// ════════════════════════════════════════════════════════════════
+// CONFIG & STATE
+// ════════════════════════════════════════════════════════════════
 const CONFIG = {
   GOOGLE_CLIENT_ID: '303849110460-10rqg6oco2jseasj4ccsh1n0e4btulea.apps.googleusercontent.com',
   VOICE_URL: 'https://n8n.talco-lr.com/webhook/talco-voice-chat',
@@ -432,9 +434,10 @@ const QUESTIONS = [
 
 const FIELD_ORDER = QUESTIONS.map(q => q.key);
 
-// MAPPING: noms de champs (du serveur) → noms de fichiers audio EXACTS
+// ════════════════════════════════════════════════════════════════
+// FIX PRINCIPAL : Mapping audio/champs strictement 1:1
+// ════════════════════════════════════════════════════════════════
 const AUDIO_FILE_MAP = {
-  // Questions principales
   'nom_client': 'nom_client',
   'numero_affaire': 'numero_affaire',
   'date_debut': 'date_debut',
@@ -451,8 +454,6 @@ const AUDIO_FILE_MAP = {
   'si_non_details': 'si_non_details',
   'difficultes': 'difficultes',
   'points_attention': 'points_attention',
-  
-  // Spécial
   'init': 'init',
   'complet': 'complete',
   'ok_court': 'ok_court',
@@ -479,7 +480,8 @@ let state = {
   swipeStartY: 0,
   swipeDx: 0,
   isSwiping: false,
-  currentQuestionIndex: 0
+  currentQuestionIndex: 0,
+  initAudioPlayed: false // FLAG pour éviter rejeu de init.mp3
 };
 
 const SESSION_KEY = 'talco_user_session';
@@ -489,6 +491,9 @@ let _audioUnlocked = false;
 let _audioContext = null;
 let _selectedVoice = localStorage.getItem('talco_voice') || 'onyx';
 
+// ════════════════════════════════════════════════════════════════
+// AUDIO UNLOCK
+// ════════════════════════════════════════════════════════════════
 async function unlockAudio() {
   if (_audioUnlocked) return true;
   try {
@@ -511,6 +516,9 @@ async function unlockAudio() {
   }
 }
 
+// ════════════════════════════════════════════════════════════════
+// SESSION STORAGE
+// ════════════════════════════════════════════════════════════════
 function saveUserSession(u) {
   localStorage.setItem(SESSION_KEY, JSON.stringify({user: u, expires: Date.now() + SESSION_TTL}));
 }
@@ -528,6 +536,9 @@ function loadUserSession() {
   }
 }
 
+// ════════════════════════════════════════════════════════════════
+// AUTH HANDLERS
+// ════════════════════════════════════════════════════════════════
 function handleGoogleCredential(r) {
   try {
     const p = JSON.parse(atob(r.credential.split('.')[1]));
@@ -545,7 +556,7 @@ function handleGoogleCredential(r) {
     saveUserSession(user);
     onUserAuthenticated(user);
   } catch (e) {
-    console.error('Erreur Google Auth:', e);
+    console.error('❌ Erreur Google Auth:', e);
     showToast('Erreur connexion');
   }
 }
@@ -572,9 +583,13 @@ function onUserAuthenticated(user) {
     av.textContent = user.initials;
   }
   document.getElementById('user-name').textContent = user.name.split(' ')[0];
+  console.log('✅ Authentification réussie pour:', user.email);
   startSession();
 }
 
+// ════════════════════════════════════════════════════════════════
+// SESSION MANAGEMENT
+// ════════════════════════════════════════════════════════════════
 function startSession() {
   state.session_id = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
   state.history = [];
@@ -586,6 +601,7 @@ function startSession() {
   state.photoFiles = [];
   state.photoUrls = [];
   state.currentQuestionIndex = 0;
+  state.initAudioPlayed = false; // Réinitialiser le flag
   
   if (state.currentAudio) {
     try { state.currentAudio.pause(); } catch (e) {}
@@ -599,15 +615,23 @@ function startSession() {
   document.getElementById('walkie-btn').className = 'walkie-btn';
   updateMicStatus('Maintiens pour parler');
   hideTimeoutBar();
+  
+  console.log('🎯 Nouvelle session créée:', state.session_id);
   showScreen('chat');
 }
 
 function newSession() { startSession(); }
 function nouveauRapport() { startSession(); }
 
+// ════════════════════════════════════════════════════════════════
+// SCREEN MANAGEMENT
+// ════════════════════════════════════════════════════════════════
 function showScreen(n) {
+  // Masquer TOUS les écrans
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  // Afficher l'écran demandé
   document.getElementById('screen-' + n).classList.add('active');
+  console.log('📺 Écran affiché:', n);
 }
 
 function showToast(msg, d = 3000) {
@@ -625,6 +649,9 @@ function updateMicStatus(msg) {
   document.getElementById('mic-status').textContent = msg;
 }
 
+// ════════════════════════════════════════════════════════════════
+// QUESTION DISPLAY & PROGRESSION
+// ════════════════════════════════════════════════════════════════
 function updateQuestionDisplay() {
   let currentIdx = QUESTIONS.findIndex(q => !state.responses[q.key]);
   if (currentIdx === -1) currentIdx = QUESTIONS.length - 1;
@@ -666,15 +693,11 @@ function updateQuestionDisplay() {
       
       chip.onclick = async () => {
         if (q.type === 'tech-single') {
-          // Sélection unique → envoie direct au backend
           state.responses[q.key] = tech;
           chipsZone.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
           chip.classList.add('selected');
-          
           await sendToAgent(null, tech);
-          
         } else {
-          // Multi-sélection → toggle + afficher le bouton valider
           const idx = currentSelected.indexOf(tech);
           if (idx >= 0) {
             currentSelected.splice(idx, 1);
@@ -683,8 +706,6 @@ function updateQuestionDisplay() {
             currentSelected.push(tech);
             chip.classList.add('multi-selected');
           }
-          
-          // Mettre à jour la visibilité du bouton valider
           const confirmBtn = document.getElementById('confirm-multi-btn-tech');
           if (confirmBtn) {
             confirmBtn.style.display = currentSelected.length > 0 ? 'block' : 'none';
@@ -694,13 +715,12 @@ function updateQuestionDisplay() {
       chipsZone.appendChild(chip);
     });
     
-    // Bouton de confirmation pour multi-sélection
     if (q.type === 'tech-multi') {
       const confirmBtn = document.createElement('button');
       confirmBtn.id = 'confirm-multi-btn-tech';
       confirmBtn.className = 'confirm-multi-btn';
       confirmBtn.textContent = 'Valider la sélection ✓';
-      confirmBtn.style.display = 'none'; // Caché au départ
+      confirmBtn.style.display = 'none';
       confirmBtn.onclick = async () => {
         if (currentSelected.length === 0) {
           showToast('Sélectionne au moins un technicien');
@@ -708,13 +728,10 @@ function updateQuestionDisplay() {
         }
         const value = currentSelected.join(', ');
         state.responses[q.key] = value;
-        
-        // Envoyer au backend
         await sendToAgent(null, value);
       };
       chipsZone.appendChild(confirmBtn);
     }
-    
   } else {
     chipsZone.style.display = 'none';
   }
@@ -733,10 +750,9 @@ function updateQuestionDisplay() {
   }
   
   // ════════════════════════════════════════════════════════════════
-  // SPECIAL : Afficher pop-up OUI/NON pour la question chantier_termine
+  // SPECIAL : Pop-up OUI/NON pour "Chantier terminé ?"
   // ════════════════════════════════════════════════════════════════
   if (q.key === 'chantier_termine' && !state.responses[q.key]) {
-    // Masquer la zone chips et afficher un pop-up OUI/NON
     chipsZone.style.display = 'none';
     answerEl.style.display = 'none';
     
@@ -813,8 +829,6 @@ function updateQuestionDisplay() {
         state.responses[q.key] = opt;
         popupContainer.remove();
         updateQuestionDisplay();
-        
-        // Envoyer la réponse au serveur
         await sendToAgent(null, opt);
       };
       
@@ -859,6 +873,9 @@ function hideTimeoutBar() {
   bar.style.width = '100%';
 }
 
+// ════════════════════════════════════════════════════════════════
+// PTT (Push-To-Talk) HANDLERS
+// ════════════════════════════════════════════════════════════════
 let _pttActive = false;
 
 function setupPTT() {
@@ -951,7 +968,7 @@ async function startRecording() {
     updateMicStatus('🔴 Parle maintenant...');
     
   } catch (e) {
-    console.error('Erreur micro:', e);
+    console.error('❌ Erreur micro:', e);
     showToast('Micro non disponible');
     _pttActive = false;
   }
@@ -968,102 +985,9 @@ function stopRecording() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// FIX PRINCIPAL : Flux audio corrigé
+// AUDIO PLAYBACK
 // ════════════════════════════════════════════════════════════════
-async function sendToAgent(audioBase64, textInput) {
-  if (state.isProcessing) return;
-  state.isProcessing = true;
-  document.getElementById('walkie-btn').classList.add('processing');
-  updateMicStatus('Envoi...');
-  updateQuestionDisplay();
-  
-  showTimeoutBar(CONFIG.TIMEOUT_MS);
-  
-  try {
-    const payload = {
-      session_id: state.session_id,
-      sender_email: state.user?.email || '',
-      sender_name: state.user?.name || '',
-      history: state.history,
-      responses: state.responses
-    };
-    if (audioBase64) payload.audio_base64 = audioBase64;
-    if (textInput === '__init__') payload.text_input = '__init__';
-    else if (textInput) payload.text_input = textInput;
-    
-    const ctrl = new AbortController();
-    const tmout = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
-    const resp = await fetch(CONFIG.VOICE_URL, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-      signal: ctrl.signal
-    });
-    clearTimeout(tmout);
-    hideTimeoutBar();
-    
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    
-    console.log('📨 Réponse serveur - next_field:', data.next_field, 'is_complete:', data.is_complete);
-    
-    state.history = data.history || state.history;
-    state.responses = {...state.responses, ...(data.responses || {})};
-    state.is_complete = data.is_complete || false;
-    state.responses = {...state.responses, ...(data.responses || {})};
-    state.is_complete = data.is_complete || false;
-    
-    updateQuestionDisplay();
-    if (state.writingMode) syncWritingPanelValues();
-    
-    // ════════════════════════════════════════════════════════════════
-    // FIX : Jouer l'audio LOCAL basé sur next_field du serveur
-    // MAIS : vérifier qu'on a réellement changé de question avant de jouer
-    // ════════════════════════════════════════════════════════════════
-    if (data.is_complete) {
-      await playLocalAudioForField('complet');
-      updateMicStatus('Rapport complet ✓');
-      showPreview();
-    // ════════════════════════════════════════════════════════════════
-    // FIX : Jouer l'audio LOCAL basé sur next_field du serveur
-    // SAUF si c'est la première question (nom_client) car init.mp3 a déjà été joué
-    // ════════════════════════════════════════════════════════════════
-    if (data.is_complete) {
-      await playLocalAudioForField('complet');
-      updateMicStatus('Rapport complet ✓');
-      showPreview();
-    } else if (data.next_field) {
-      // FIX : Ne pas rejuer l'audio s'il s'agit de la première question
-      // car init.mp3 a déjà été joué dans startReport()
-      const isFirstQuestion = !state.history || state.history.length === 0;
-      
-      if (isFirstQuestion && data.next_field === 'nom_client') {
-        console.log('⏭️ Première question détectée, audio init déjà joué, skip audio nom_client');
-        // Ne pas jouer l'audio, juste mettre à jour l'affichage
-      } else {
-        // Jouer l'audio pour les autres questions
-        console.log('🎵 Jouer audio pour:', data.next_field);
-        await playLocalAudioForField(data.next_field);
-      }
-    }
-    
-  } catch (e) {
-    hideTimeoutBar();
-    const msg = e.name === 'AbortError' ? 'Timeout — serveur trop long' : e.message;
-    showToast('Erreur : ' + msg);
-    updateMicStatus('Erreur — réessaie');
-  } finally {
-    state.isProcessing = false;
-    document.getElementById('walkie-btn').classList.remove('processing', 'listening');
-    if (!state.is_complete) {
-      updateMicStatus('Maintiens pour parler');
-    }
-    updateQuestionDisplay();
-  }
-}
-
 async function playLocalAudioForField(fieldKey) {
-  // Utiliser le mapping pour obtenir le nom EXACT du fichier audio
   const audioFileName = AUDIO_FILE_MAP[fieldKey];
   
   if (!audioFileName) {
@@ -1071,7 +995,6 @@ async function playLocalAudioForField(fieldKey) {
     return;
   }
   
-  // FIX : Chemin correct pour GitHub Pages (/talco-intervention/audio/...)
   const baseUrl = window.location.pathname.includes('talco-intervention') 
     ? '/talco-intervention/audio' 
     : './audio';
@@ -1115,7 +1038,91 @@ async function playLocalAudioForField(fieldKey) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// FIX #2 : Antenne animation pendant la connexion
+// AGENT COMMUNICATION — FIX PRINCIPAL
+// ════════════════════════════════════════════════════════════════
+async function sendToAgent(audioBase64, textInput) {
+  if (state.isProcessing) return;
+  state.isProcessing = true;
+  document.getElementById('walkie-btn').classList.add('processing');
+  updateMicStatus('Envoi...');
+  
+  // ⚠️ NE PAS appeler updateQuestionDisplay() ici
+  // car cela rend le changement de question visible trop tôt
+  
+  showTimeoutBar(CONFIG.TIMEOUT_MS);
+  
+  try {
+    const payload = {
+      session_id: state.session_id,
+      sender_email: state.user?.email || '',
+      sender_name: state.user?.name || '',
+      history: state.history,
+      responses: state.responses
+    };
+    if (audioBase64) payload.audio_base64 = audioBase64;
+    if (textInput === '__init__') payload.text_input = '__init__';
+    else if (textInput) payload.text_input = textInput;
+    
+    const ctrl = new AbortController();
+    const tmout = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
+    const resp = await fetch(CONFIG.VOICE_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    });
+    clearTimeout(tmout);
+    hideTimeoutBar();
+    
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    
+    console.log('📨 Réponse serveur - next_field:', data.next_field, 'is_complete:', data.is_complete);
+    
+    // Mettre à jour l'état SANS afficher le changement tout de suite
+    state.history = data.history || state.history;
+    state.responses = {...state.responses, ...(data.responses || {})};
+    state.is_complete = data.is_complete || false;
+    
+    // ════════════════════════════════════════════════════════════════
+    // PUIS jouer l'audio PUIS mettre à jour l'affichage
+    // ════════════════════════════════════════════════════════════════
+    if (data.is_complete) {
+      await playLocalAudioForField('complet');
+      updateMicStatus('Rapport complet ✓');
+      updateQuestionDisplay(); // Affiche le changement de question APRÈS audio
+      showPreview();
+    } else if (data.next_field) {
+      // Déterminer s'il faut jouer l'audio pour la prochaine question
+      const isFirstQuestionField = data.next_field === 'nom_client' && state.initAudioPlayed;
+      
+      if (isFirstQuestionField) {
+        console.log('⏭️ Première question, init déjà joué, skip audio nom_client');
+      } else {
+        console.log('🎵 Jouer audio pour:', data.next_field);
+        await playLocalAudioForField(data.next_field);
+      }
+      
+      // Afficher le changement de question APRÈS audio
+      updateQuestionDisplay();
+    }
+    
+  } catch (e) {
+    hideTimeoutBar();
+    const msg = e.name === 'AbortError' ? 'Timeout — serveur trop long' : e.message;
+    showToast('Erreur : ' + msg);
+    updateMicStatus('Erreur — réessaie');
+  } finally {
+    state.isProcessing = false;
+    document.getElementById('walkie-btn').classList.remove('processing', 'listening');
+    if (!state.is_complete) {
+      updateMicStatus('Maintiens pour parler');
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// START REPORT — Playback init.mp3 UNE SEULE FOIS
 // ════════════════════════════════════════════════════════════════
 async function startReport() {
   await unlockAudio();
@@ -1123,17 +1130,15 @@ async function startReport() {
   document.getElementById('mic-zone').classList.add('started');
   document.getElementById('connection-state').classList.add('visible');
   
-  if (state.history.length === 0 && !state.isInitializing && !state.isProcessing) {
+  if (!state.initAudioPlayed && state.history.length === 0) {
     state.isInitializing = true;
     
-    // Jouer init.mp3 pour dire bonjour
     console.log('🎯 Étape 1: Jouer init.mp3');
     await playLocalAudioForField('init');
+    state.initAudioPlayed = true; // FLAG pour éviter rejeu
     
-    // Attendre un peu avant d'appeler le serveur
     await new Promise(r => setTimeout(r, 500));
     
-    // Envoyer __init__ au serveur
     console.log('🎯 Étape 2: Appeler serveur avec __init__');
     await sendToAgent(null, '__init__');
     
@@ -1172,8 +1177,9 @@ function toggleWritingMode() {
   updateQuestionDisplay();
 }
 
-// [Reste du code identique à l'original : buildWritingCards, photos, preview, etc.]
-// Le code suivant est copié du fichier original sans modifications
+// ════════════════════════════════════════════════════════════════
+// WRITING MODE — Unchanged from original
+// ════════════════════════════════════════════════════════════════
 
 function buildWritingCards() {
   const track = document.getElementById('writing-cards-track');
@@ -1691,7 +1697,7 @@ async function submitReport() {
     showConfirmation();
     
   } catch (e) {
-    console.error('Erreur envoi rapport:', e);
+    console.error('❌ Erreur envoi rapport:', e);
     document.getElementById('loading').classList.remove('visible');
     showToast('Erreur réseau : ' + e.message);
     showConfirmation();
