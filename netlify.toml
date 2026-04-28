@@ -1,0 +1,22 @@
+# Aucun proxy n'est utilisé : index.html appelle directement
+# https://n8n.talco-lr.com/webhook/talco-voice-chat
+# Le serveur n8n doit donc avoir CORS configuré pour autoriser
+# le domaine de la PWA (Access-Control-Allow-Origin).
+#
+# Si tu réintroduis des proxies plus tard, ajoute des [[redirects]]
+# ici (cf. doc Netlify).
+
+[build]
+  publish = "."
+
+# Headers PWA recommandés
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/audio/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
