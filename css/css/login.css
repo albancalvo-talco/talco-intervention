@@ -1,0 +1,61 @@
+/* ══════════════════════════════════════════════════════════════
+   LOGIN
+   ══════════════════════════════════════════════════════════════ */
+
+#screen-login {
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  gap: 1.2rem;
+}
+
+.login-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.1;
+}
+.login-title span { color: var(--gold); }
+
+.login-sub {
+  font-size: 13px;
+  color: var(--text2);
+  text-align: center;
+}
+
+.btn-google {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--s3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 14px 24px;
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  max-width: 300px;
+  justify-content: center;
+}
+.btn-google svg { width: 20px; height: 20px; }
+
+.login-note {
+  font-size: 11px;
+  color: var(--text3);
+  text-align: center;
+}
+
+#login-error {
+  display: none;
+  padding: 10px 16px;
+  background: rgba(224, 82, 82, .1);
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--danger);
+  text-align: center;
+  max-width: 300px;
+}
