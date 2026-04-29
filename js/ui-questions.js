@@ -101,13 +101,16 @@ function _renderChips(q, container) {
   container.innerHTML = '';
 
   // ────────────────────────────────────────────────────────────
-  // PRÉ-COCHAGE Q8 : si on est sur "techniciens_presents" et que
-  // l'utilisateur a déjà un rédacteur (auto-rempli via Google),
-  // on pré-coche automatiquement cette personne.
+  // PRÉ-COCHAGE Q8 : si on arrive sur "techniciens_presents" et que
+  // l'utilisateur a déjà un rédacteur, on pré-coche cette personne
+  // VISUELLEMENT (classe CSS uniquement) — sans toucher à state.responses
+  // pour ne pas que updateQuestionDisplay considère Q8 comme remplie.
+  // L'inscription dans state.responses se fait au clic sur Valider.
   // ────────────────────────────────────────────────────────────
+  let preCheckedTechs = [];
   if (q.key === 'techniciens_presents' && !state.responses[q.key] && state.responses.redacteur) {
-    state.responses[q.key] = state.responses.redacteur;
-    console.log('✨ Pré-cochage Q8 avec rédacteur:', state.responses.redacteur);
+    preCheckedTechs = [state.responses.redacteur];
+    console.log('✨ Pré-cochage visuel Q8 avec rédacteur:', state.responses.redacteur);
   }
 
   TECHNICIENS.forEach(tech => {
@@ -116,10 +119,10 @@ function _renderChips(q, container) {
     chip.textContent = tech;
     chip.dataset.tech = tech;
 
-    // État initial selon state.responses
+    // État initial selon state.responses (priorité 1) ou pré-cochage (priorité 2)
     const currentSelected = state.responses[q.key]
       ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
-      : [];
+      : preCheckedTechs;
 
     if (q.type === 'tech-single' && state.responses[q.key] === tech) {
       chip.classList.add('selected');
@@ -137,7 +140,7 @@ function _renderChips(q, container) {
   confirmBtn.className = 'confirm-multi-btn';
   confirmBtn.textContent = 'Valider ✓';
   confirmBtn.dataset.role = 'confirm';
-  confirmBtn.onclick = () => _onChipsConfirm(q);
+  confirmBtn.onclick = () => _onChipsConfirm(q, container);
   container.appendChild(confirmBtn);
 }
 
@@ -146,37 +149,38 @@ function _onChipClick(q, chip, container) {
   const tech = chip.dataset.tech;
 
   if (q.type === 'tech-single') {
-    // Single : un seul sélectionné à la fois
+    // Single : un seul sélectionné à la fois → on écrit dans state directement
     state.responses[q.key] = tech;
     container.querySelectorAll('.tech-chip').forEach(c => c.classList.remove('selected'));
     chip.classList.add('selected');
     return;
   }
 
-  // Multi : toggle
-  const currentSelected = state.responses[q.key]
-    ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
-    : [];
-
-  const idx = currentSelected.indexOf(tech);
-  if (idx >= 0) {
-    currentSelected.splice(idx, 1);
-    chip.classList.remove('multi-selected');
-  } else {
-    currentSelected.push(tech);
-    chip.classList.add('multi-selected');
-  }
-
-  if (currentSelected.length > 0) {
-    state.responses[q.key] = currentSelected.join(', ');
-  } else {
-    delete state.responses[q.key];
-  }
+  // Multi : on toggle JUSTE la classe CSS, sans toucher à state.responses
+  // (state.responses sera renseigné au clic sur Valider, voir _onChipsConfirm)
+  chip.classList.toggle('multi-selected');
 }
 
 // Validation des chips
-async function _onChipsConfirm(q) {
-  const val = state.responses[q.key];
+async function _onChipsConfirm(q, container) {
+  let val;
+
+  if (q.type === 'tech-single') {
+    // Single : déjà inscrit dans state au clic du chip
+    val = state.responses[q.key];
+  } else {
+    // Multi : on lit l'état des chips dans le DOM (incluant les pré-cochés)
+    const selectedChips = container.querySelectorAll('.tech-chip.multi-selected');
+    const techs = Array.from(selectedChips).map(c => c.dataset.tech);
+    val = techs.join(', ');
+    // On inscrit MAINTENANT (pas avant) pour que la validation parte avec la bonne valeur
+    if (val) {
+      state.responses[q.key] = val;
+    } else {
+      delete state.responses[q.key];
+    }
+  }
+
   if (!val || val.trim() === '') {
     showToast('Sélectionne au moins une personne');
     return;
@@ -191,17 +195,22 @@ async function _onChipsConfirm(q) {
 // Met à jour les classes des chips sans tout recréer
 // (utilisé quand updateQuestionDisplay est appelé pendant le rendu)
 function _refreshChipsSelection(q, container) {
-  const currentSelected = state.responses[q.key]
-    ? state.responses[q.key].split(',').map(s => s.trim()).filter(Boolean)
-    : [];
+  if (q.type === 'tech-single') {
+    container.querySelectorAll('.tech-chip').forEach(chip => {
+      chip.classList.toggle('selected', state.responses[q.key] === chip.dataset.tech);
+    });
+    return;
+  }
 
+  // Multi : on ne synchronise depuis state.responses QUE si state.responses[q.key]
+  // existe (sinon ça écraserait les pré-cochages visuels qui ne sont pas encore
+  // dans state).
+  if (!state.responses[q.key]) return;
+
+  const currentSelected = state.responses[q.key]
+    .split(',').map(s => s.trim()).filter(Boolean);
   container.querySelectorAll('.tech-chip').forEach(chip => {
-    const tech = chip.dataset.tech;
-    if (q.type === 'tech-single') {
-      chip.classList.toggle('selected', state.responses[q.key] === tech);
-    } else {
-      chip.classList.toggle('multi-selected', currentSelected.includes(tech));
-    }
+    chip.classList.toggle('multi-selected', currentSelected.includes(chip.dataset.tech));
   });
 }
 
