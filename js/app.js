@@ -51,11 +51,19 @@ window.newSession = function() { startSession(); };
 // ══════════════════════════════════════════════════════════════
 // DÉMARRAGE DU RAPPORT
 // ══════════════════════════════════════════════════════════════
+//
+// Note : on n'ajoute PLUS la classe `started` sur mic-zone ici.
+// Elle sera ajoutée seulement après le clic sur "Commencer"
+// (cf. ui-questions.js → showStartButton → startBtn.onclick).
+// Cela évite que le walkie-talkie apparaisse pendant l'écran
+// "Prêt à commencer ?".
+//
+// ══════════════════════════════════════════════════════════════
 
 window.startReport = async function() {
   await unlockAudio();
 
-  document.getElementById('mic-zone').classList.add('started');
+  // Affiche la zone de connexion (antenne) MAIS pas encore le walkie
   document.getElementById('connection-state').classList.add('visible');
 
   if (state.history.length === 0 && state.phase === 'idle') {
