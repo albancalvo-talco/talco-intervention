@@ -7,8 +7,8 @@
 //   (pas si on est en train de parler ou d'envoyer)
 // - Si l'utilisateur appuie pendant qu'un audio joue, on stoppe
 //   l'audio et on démarre l'enregistrement
-// - Si la question courante a des chips (Q7/Q8), on n'envoie PAS
-//   l'audio enregistré au serveur (on bloque l'envoi)
+// - Si la question courante a des chips ou yes/no (Q7/Q8/Q13),
+//   on n'envoie PAS l'audio enregistré au serveur
 // ══════════════════════════════════════════════════════════════
 
 let _pttActive = false;
@@ -35,8 +35,7 @@ async function _handlePTTStart(e) {
 
   if (_pttActive) return;
 
-  // Bloquer si on est déjà en enregistrement, envoi, ou parole
-  // → mais si on parle, on stoppe l'audio et on enregistre
+  // Si on parle, on stoppe l'audio et on enregistre
   if (state.phase === 'speaking') {
     stopCurrentAudio();
     setPhase('idle');
@@ -71,6 +70,17 @@ async function _handlePTTEnd(e) {
 }
 
 async function startRecording() {
+  // Bloquer si la question courante a des boutons (chips ou yes/no)
+  // → on bloque dès le départ pour ne même pas ouvrir le micro
+  const currentQ = QUESTIONS[state.currentQuestionIndex];
+  if (currentQ && (currentQ.type === 'tech-single' || currentQ.type === 'tech-multi' || currentQ.type === 'yesno')) {
+    console.log('⚠️ Question avec boutons — micro bloqué');
+    showToast('Utilise les boutons pour choisir');
+    updateMicStatus('Utilise les boutons ci-dessus');
+    _pttActive = false;
+    return;
+  }
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     state.audioChunks = [];
@@ -99,18 +109,7 @@ async function startRecording() {
         return;
       }
 
-      // BLOQUER si la question courante a des chips ou yes/no (Q7/Q8/Q13)
-      const currentQ = QUESTIONS[state.currentQuestionIndex];
-      if (currentQ && (currentQ.type === 'tech-single' || currentQ.type === 'tech-multi' || currentQ.type === 'yesno')) {
-        console.log('⚠️ Question avec boutons — audio ignoré, utilise les boutons');
-        showToast('Utilise les boutons pour choisir');
-        setPhase('idle');
-        updateMicStatus('Utilise les boutons ci-dessus');
-        document.getElementById('walkie-btn')?.classList.remove('listening', 'processing');
-  return;
-}
-
-      // BLOQUER si déjà en envoi (race condition)
+      // Bloquer si déjà en envoi (race condition)
       if (state.phase === 'sending') {
         console.warn('⚠️ Envoi déjà en cours, audio ignoré');
         return;
@@ -139,7 +138,6 @@ function stopRecording() {
     document.getElementById('walkie-btn')?.classList.remove('listening');
     document.getElementById('walkie-btn')?.classList.add('processing');
     updateMicStatus('Envoi...');
-    // La phase passera à 'sending' dans sendToAgent
   }
 }
 
