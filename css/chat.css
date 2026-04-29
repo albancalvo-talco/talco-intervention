@@ -534,3 +534,57 @@
   width: 100%;
   transition: width linear;
 }
+/* ══ Boutons Oui/Non (Q13) ══ */
+.q-yesno-zone {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.q-yesno-zone .yesno-row {
+  display: flex;
+  gap: 10px;
+}
+.q-yesno-zone .yesno-btn {
+  flex: 1;
+  padding: 16px;
+  border-radius: 12px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: var(--s2);
+  color: var(--text);
+  transition: all .2s;
+}
+.q-yesno-zone .yesno-btn:active { transform: scale(.97); }
+.q-yesno-zone .yesno-btn.selected-oui {
+  background: rgba(78, 203, 122, .15);
+  border-color: rgba(78, 203, 122, .5);
+  color: var(--success);
+}
+.q-yesno-zone .yesno-btn.selected-non {
+  background: rgba(224, 82, 82, .12);
+  border-color: rgba(224, 82, 82, .4);
+  color: var(--danger);
+}
+.q-yesno-zone .confirm-yesno-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  background: var(--success);
+  color: #fff;
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s;
+}
+.q-yesno-zone .confirm-yesno-btn:active { transform: scale(.97); }
+.q-yesno-zone .confirm-yesno-btn:disabled {
+  background: var(--s3);
+  color: var(--text3);
+  cursor: not-allowed;
+}
