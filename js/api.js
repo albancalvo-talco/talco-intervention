@@ -2,21 +2,21 @@
 // API — Communication avec le backend n8n
 // ══════════════════════════════════════════════════════════════
 //
-// sendToAgent : envoie audio_base64 ou text_input au webhook
-// submitReport : envoie le rapport final (avec photos)
+// 3 fonctions :
+// - sendToAgent       : audio ou texte libre → passe par l'agent OpenAI
+// - sendButtonValue   : valeur d'un bouton (chip / yes/no) → bypass agent
+// - submitReport      : envoi final du rapport (avec photos)
 //
 // Garde anti-double-envoi via state.phase + lastSendTime.
 // Aucun audio joué pendant la phase __init__ (isInitPhase=true).
 // ══════════════════════════════════════════════════════════════
 
 async function sendToAgent(audioBase64, textInput) {
-  // Garde 1 : phase
   if (state.phase === 'sending') {
     console.warn('⚠️ sendToAgent déjà en cours');
     return;
   }
 
-  // Garde 2 : throttle (anti-double-clic rapide)
   const now = Date.now();
   if (state.lastSendTime && (now - state.lastSendTime) < 800) {
     console.warn('⚠️ Appel trop rapide, ignoré');
@@ -29,7 +29,6 @@ async function sendToAgent(audioBase64, textInput) {
   updateMicStatus('Envoi...');
   showTimeoutBar(CONFIG.TIMEOUT_MS);
 
-  // Mémoriser le champ pour lequel on envoie (pour détecter une boucle ensuite)
   const fieldBeforeSend = QUESTIONS[state.currentQuestionIndex]?.key;
 
   let data = null;
@@ -77,11 +76,9 @@ async function sendToAgent(audioBase64, textInput) {
     return;
   }
 
-  // Sortir de 'sending'
   document.getElementById('walkie-btn')?.classList.remove('processing', 'listening');
 
-  // Phase init : pas d'audio, pas d'affichage de question
-  // (on reste en idle — l'utilisateur cliquera sur "Commencer")
+  // Phase init : pas d'audio, pas d'affichage
   if (textInput === '__init__' || state.isInitPhase) {
     setPhase('idle');
     return;
@@ -101,24 +98,17 @@ async function sendToAgent(audioBase64, textInput) {
   if (data && data.next_field) {
     let nextField = data.next_field;
 
-    // ──────────────────────────────────────────────────────────
-    // GARDE ANTI-BOUCLE : si le serveur nous renvoie EXACTEMENT
-    // le même champ qu'on vient d'envoyer ET que la réponse n'a
-    // PAS été enregistrée, c'est que l'agent n'a pas pu extraire
-    // → on alerte l'utilisateur au lieu de rejouer en boucle.
-    // ──────────────────────────────────────────────────────────
+    // Garde anti-boucle (audio uniquement) : si même champ et pas stocké,
+    // l'agent n'a pas pu extraire → on alerte au lieu de rejouer
     const responseStored = !!state.responses[fieldBeforeSend];
     if (nextField === fieldBeforeSend && !responseStored && audioBase64) {
       console.warn('🔁 Boucle détectée sur:', fieldBeforeSend);
       showToast('Je n\'ai pas bien compris, réessaie en parlant plus clairement');
       updateMicStatus('Réessaie — parle distinctement');
-      return; // on ne rejoue PAS l'audio, on attend une nouvelle réponse
+      return;
     }
 
-    // ──────────────────────────────────────────────────────────
-    // AUTO-SKIP : si la prochaine question est 'redacteur' et
-    // qu'on l'a déjà rempli via Google, on saute à la suivante
-    // ──────────────────────────────────────────────────────────
+    // Auto-skip redacteur si déjà rempli via Google
     if (nextField === 'redacteur' && state.responses.redacteur) {
       console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
       nextField = 'techniciens_presents';
@@ -134,11 +124,114 @@ async function sendToAgent(audioBase64, textInput) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// SYNC DIRECT — bypass agent OpenAI pour les boutons
+// ══════════════════════════════════════════════════════════════
+//
+// Utilisé quand l'utilisateur clique un bouton (chip ou yes/no).
+// La valeur est connue, pas d'ambiguïté → on bypass l'agent
+// OpenAI et on demande juste un recalcul de next_field au serveur.
+//
+// Côté n8n : nécessite la branche `IF — Action sync ?` qui route
+// vers `Code — Sync direct`.
+// ══════════════════════════════════════════════════════════════
+
+async function sendButtonValue(fieldKey, value) {
+  if (state.phase === 'sending') {
+    console.warn('⚠️ sendButtonValue déjà en cours');
+    return;
+  }
+
+  state.lastSendTime = Date.now();
+  setPhase('sending');
+  document.getElementById('walkie-btn')?.classList.add('processing');
+  updateMicStatus('Envoi...');
+  showTimeoutBar(CONFIG.TIMEOUT_MS);
+
+  // Inscrire la valeur dans state.responses (au cas où le caller ne l'a pas fait)
+  state.responses[fieldKey] = value;
+
+  let data = null;
+
+  try {
+    const payload = {
+      session_id:   state.session_id,
+      sender_email: state.user?.email || '',
+      sender_name:  state.user?.name || '',
+      history:      state.history,
+      responses:    state.responses,
+      action:       'sync',
+      text_input:   value
+    };
+
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
+
+    const resp = await fetch(CONFIG.VOICE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    });
+
+    clearTimeout(timeout);
+    hideTimeoutBar();
+
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    data = await resp.json();
+
+    state.history = data.history || state.history;
+    state.responses = { ...state.responses, ...(data.responses || {}) };
+    state.is_complete = data.is_complete || false;
+
+    if (state.writingMode) syncWritingPanelValues();
+
+  } catch (e) {
+    hideTimeoutBar();
+    const msg = e.name === 'AbortError' ? 'Timeout' : e.message;
+    showToast('Erreur : ' + msg);
+    updateMicStatus('Erreur — réessaie');
+    setPhase('idle');
+    return;
+  }
+
+  document.getElementById('walkie-btn')?.classList.remove('processing', 'listening');
+  setPhase('idle');
+
+  // Rapport complet
+  if (state.is_complete) {
+    updateMicStatus('Rapport complet ✓');
+    await playLocalAudio('complet').catch(() => {});
+    showPreview();
+    return;
+  }
+
+  // Avancer vers la prochaine question
+  if (data && data.next_field) {
+    let nextField = data.next_field;
+
+    // Auto-skip redacteur si déjà rempli via Google
+    if (nextField === 'redacteur' && state.responses.redacteur) {
+      console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
+      nextField = 'techniciens_presents';
+    }
+
+    const nextIdx = QUESTIONS.findIndex(q => q.key === nextField);
+    if (nextIdx !== -1) state.currentQuestionIndex = nextIdx;
+
+    updateQuestionDisplay();
+    await playLocalAudio(nextField).catch(() => {});
+    updateMicStatus('Maintiens pour parler');
+  }
+}
+
+window.sendButtonValue = sendButtonValue;
+
+// ══════════════════════════════════════════════════════════════
 // SOUMISSION DU RAPPORT FINAL
 // ══════════════════════════════════════════════════════════════
 
 async function submitReport() {
-  // Récupérer les valeurs éventuellement éditées dans le preview
+  // Récupérer les valeurs éditées dans le preview
   document.querySelectorAll('#preview-body .pf-value').forEach(inp => {
     const key = inp.dataset.key;
     const val = inp.value.trim();
@@ -190,7 +283,6 @@ async function submitReport() {
   }
 }
 
-// Expose globalement (utilisé par les boutons HTML inline)
 window.submitReport = submitReport;
 
 // ══════════════════════════════════════════════════════════════
