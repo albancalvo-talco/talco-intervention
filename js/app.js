@@ -63,7 +63,10 @@ window.newSession = function() { startSession(); };
 window.startReport = async function() {
   await unlockAudio();
 
-  // Affiche la zone de connexion (antenne) MAIS pas encore le walkie
+  // Cache la mic-zone entière pendant l'init + l'écran Commencer
+  document.getElementById('mic-zone').style.display = 'none';
+
+  // Affiche la zone de connexion (antenne) au-dessus
   document.getElementById('connection-state').classList.add('visible');
 
   if (state.history.length === 0 && state.phase === 'idle') {
