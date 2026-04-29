@@ -99,16 +99,16 @@ async function startRecording() {
         return;
       }
 
-      // BLOQUER si la question courante a des chips (Q7/Q8)
+      // BLOQUER si la question courante a des chips ou yes/no (Q7/Q8/Q13)
       const currentQ = QUESTIONS[state.currentQuestionIndex];
-      if (currentQ && (currentQ.type === 'tech-single' || currentQ.type === 'tech-multi')) {
-        console.log('⚠️ Question avec chips — audio ignoré, utilise les boutons');
+      if (currentQ && (currentQ.type === 'tech-single' || currentQ.type === 'tech-multi' || currentQ.type === 'yesno')) {
+        console.log('⚠️ Question avec boutons — audio ignoré, utilise les boutons');
         showToast('Utilise les boutons pour choisir');
         setPhase('idle');
         updateMicStatus('Utilise les boutons ci-dessus');
         document.getElementById('walkie-btn')?.classList.remove('listening', 'processing');
-        return;
-      }
+  return;
+}
 
       // BLOQUER si déjà en envoi (race condition)
       if (state.phase === 'sending') {
