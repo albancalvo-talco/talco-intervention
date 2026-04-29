@@ -208,8 +208,8 @@ async function _onChipsConfirm(q, container) {
   if (state.phase === 'sending') return;
 
   // Envoyer au serveur
-  await sendToAgent(null, val);
-}
+  await sendButtonValue(q.key, val);
+}}
 
 // Met à jour les classes des chips sans tout recréer
 // (utilisé quand updateQuestionDisplay est appelé pendant le rendu)
@@ -293,7 +293,7 @@ async function _onYesnoConfirm(q) {
     return;
   }
   if (state.phase === 'sending') return;
-  await sendToAgent(null, val);
+  await sendButtonValue(q.key, val);
 }
 
 function _refreshYesnoSelection(q, container) {
@@ -348,6 +348,9 @@ function showStartButton() {
   startBtn.onclick = async () => {
     document.getElementById('start-button-zone').style.display = 'none';
     document.getElementById('question-content').style.display = 'block';
+    document.getElementById('mic-zone').classList.add('started');
+
+    // Démarrer sur la première question non remplie
 
     // Démarrer sur la première question non remplie
     // (peut être 'techniciens_presents' si redacteur auto-rempli)
