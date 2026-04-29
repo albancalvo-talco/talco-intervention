@@ -12,6 +12,7 @@
 
 // Mémo pour savoir si les chips sont déjà rendus pour la question courante
 let _chipsRenderedFor = null;
+let _yesnoRenderedFor = null;
 
 function updateQuestionDisplay() {
   // Priorité 1 : si state.currentQuestionIndex est défini ET correspond à une
