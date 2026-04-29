@@ -32,7 +32,6 @@ function startSession() {
 
   // Auto-fill redacteur + techniciens_presents depuis Google
   autofillFromGoogle();
-
   stopCurrentAudio();
   closeWritingPanel();
 
@@ -41,6 +40,11 @@ function startSession() {
   document.getElementById('start-button-zone').style.display = 'none';
   document.getElementById('connection-state')?.classList.remove('visible');
   document.getElementById('walkie-btn')?.classList.remove('listening', 'processing', 'speaking');
+
+  // Restaurer les boutons Audio/Écrit
+  const btnsWrapper = document.querySelector('.mic-start-state .buttons-wrapper');
+  if (btnsWrapper) btnsWrapper.style.display = 'flex';
+
   updateMicStatus('Maintiens pour parler');
   hideTimeoutBar();
   showScreen('chat');
@@ -62,15 +66,13 @@ window.newSession = function() { startSession(); };
 
 window.startReport = async function() {
   await unlockAudio();
+  
+  document.querySelector('.mic-start-state .buttons-wrapper').style.display = 'none';
 
-  // Cache la mic-zone entière pendant l'init + l'écran Commencer
-  document.getElementById('mic-zone').style.display = 'none';
-
-  // Affiche la zone de connexion (antenne) au-dessus
+  // Affiche la zone de connexion (antenne)
   document.getElementById('connection-state').classList.add('visible');
 
   if (state.history.length === 0 && state.phase === 'idle') {
-    state.isInitPhase = true;
 
     // Init en parallèle : audio init + appel serveur
     const initAudio = playLocalAudio('init').catch(() => {});
