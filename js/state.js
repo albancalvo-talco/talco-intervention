@@ -138,7 +138,10 @@ function matchTechnicien(googleName) {
   return null;
 }
 
-// Pré-remplit redacteur + techniciens_presents si match Google trouvé
+// Pré-remplit redacteur si match Google trouvé.
+// Note : on NE pré-remplit PAS techniciens_presents pour ne pas sauter Q8.
+// Le pré-cochage du chip dans Q8 se fait dans ui-questions.js → _renderChips()
+// (basé sur state.responses.redacteur), sans toucher à state.responses.techniciens_presents.
 function autofillFromGoogle() {
   if (!state.user || !state.user.name) return;
   const matched = matchTechnicien(state.user.name);
@@ -148,6 +151,6 @@ function autofillFromGoogle() {
   }
   console.log('✅ Match technicien Google:', state.user.name, '→', matched);
   state.responses.redacteur = matched;
-  // Pré-cocher dans techniciens_presents (le user pourra ajouter d'autres)
-  state.responses.techniciens_presents = matched;
+  // PAS de pré-remplissage de techniciens_presents : on veut que Q8 soit posée,
+  // avec ce nom déjà coché en pré-sélection (cf. _renderChips).
 }
