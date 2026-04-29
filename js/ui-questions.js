@@ -234,6 +234,81 @@ function _refreshChipsSelection(q, container) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// YES/NO (Q13 chantier_termine)
+// ══════════════════════════════════════════════════════════════
+
+function _renderYesno(q, container) {
+  container.innerHTML = '';
+
+  const row = document.createElement('div');
+  row.className = 'yesno-row';
+
+  ['OUI', 'NON'].forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'yesno-btn';
+    btn.textContent = opt;
+    btn.dataset.val = opt;
+
+    // Pré-sélection si déjà répondu
+    const current = (state.responses[q.key] || '').toUpperCase();
+    if (current === opt) {
+      btn.classList.add(opt === 'OUI' ? 'selected-oui' : 'selected-non');
+    }
+
+    btn.onclick = () => _onYesnoClick(q, btn, container);
+    row.appendChild(btn);
+  });
+  container.appendChild(row);
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'confirm-yesno-btn';
+  confirmBtn.textContent = 'Valider ✓';
+  confirmBtn.disabled = !state.responses[q.key];
+  confirmBtn.dataset.role = 'confirm';
+  confirmBtn.onclick = () => _onYesnoConfirm(q);
+  container.appendChild(confirmBtn);
+}
+
+function _onYesnoClick(q, btn, container) {
+  const opt = btn.dataset.val;
+  // Réécrit la valeur "Oui" / "Non" (capitalisé pour matcher l'agent)
+  const formatted = opt === 'OUI' ? 'Oui' : 'Non';
+  state.responses[q.key] = formatted;
+
+  // Reset visuel + sélection
+  container.querySelectorAll('.yesno-btn').forEach(b => {
+    b.classList.remove('selected-oui', 'selected-non');
+  });
+  btn.classList.add(opt === 'OUI' ? 'selected-oui' : 'selected-non');
+
+  // Activer le bouton Valider
+  const confirmBtn = container.querySelector('.confirm-yesno-btn');
+  if (confirmBtn) confirmBtn.disabled = false;
+}
+
+async function _onYesnoConfirm(q) {
+  const val = state.responses[q.key];
+  if (!val) {
+    showToast('Choisis OUI ou NON');
+    return;
+  }
+  if (state.phase === 'sending') return;
+  await sendToAgent(null, val);
+}
+
+function _refreshYesnoSelection(q, container) {
+  const current = (state.responses[q.key] || '').toUpperCase();
+  container.querySelectorAll('.yesno-btn').forEach(btn => {
+    btn.classList.remove('selected-oui', 'selected-non');
+    if (btn.dataset.val === current) {
+      btn.classList.add(current === 'OUI' ? 'selected-oui' : 'selected-non');
+    }
+  });
+  const confirmBtn = container.querySelector('.confirm-yesno-btn');
+  if (confirmBtn) confirmBtn.disabled = !state.responses[q.key];
+}
+
+// ══════════════════════════════════════════════════════════════
 // AFFICHAGE DU CONTENU PRINCIPAL (après "Commencer")
 // ══════════════════════════════════════════════════════════════
 
