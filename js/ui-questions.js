@@ -14,9 +14,18 @@
 let _chipsRenderedFor = null;
 
 function updateQuestionDisplay() {
-  // Trouver l'index de la première question non remplie
-  let currentIdx = QUESTIONS.findIndex(q => !state.responses[q.key]);
-  if (currentIdx === -1) currentIdx = QUESTIONS.length - 1;
+  // Priorité 1 : si state.currentQuestionIndex est défini ET correspond à une
+  // question non encore remplie, on l'utilise.
+  // Priorité 2 : sinon on prend la 1ère question non remplie.
+  let currentIdx = state.currentQuestionIndex;
+  const currentKey = QUESTIONS[currentIdx]?.key;
+  const currentFilled = currentKey && state.responses[currentKey];
+
+  if (currentFilled || currentIdx == null || currentIdx < 0) {
+    // L'index actuel pointe sur une question déjà remplie → on cherche la suivante
+    currentIdx = QUESTIONS.findIndex(q => !state.responses[q.key]);
+    if (currentIdx === -1) currentIdx = QUESTIONS.length - 1;
+  }
   state.currentQuestionIndex = currentIdx;
 
   const q = QUESTIONS[currentIdx];
@@ -43,16 +52,16 @@ function updateQuestionDisplay() {
   document.getElementById('q-hint').textContent = q.hint || '';
 
   // ── Chips (Q7/Q8) ou pas
+  // On affiche TOUJOURS les chips pour les questions tech-* (même si déjà rempli),
+  // pour permettre à l'utilisateur de modifier sa sélection.
   const chipsZone = document.getElementById('q-chips-zone');
   const isChipsQuestion = (q.type === 'tech-single' || q.type === 'tech-multi');
 
-  if (isChipsQuestion && !state.responses[q.key]) {
-    // N'est-ce que la même question qu'on a déjà rendue ?
+  if (isChipsQuestion) {
     if (_chipsRenderedFor !== q.key) {
       _renderChips(q, chipsZone);
       _chipsRenderedFor = q.key;
     } else {
-      // Mise à jour discrète des classes selon state actuel
       _refreshChipsSelection(q, chipsZone);
     }
     chipsZone.style.display = 'flex';
@@ -90,6 +99,16 @@ function updateQuestionDisplay() {
 // Rendu initial des chips (single ou multi)
 function _renderChips(q, container) {
   container.innerHTML = '';
+
+  // ────────────────────────────────────────────────────────────
+  // PRÉ-COCHAGE Q8 : si on est sur "techniciens_presents" et que
+  // l'utilisateur a déjà un rédacteur (auto-rempli via Google),
+  // on pré-coche automatiquement cette personne.
+  // ────────────────────────────────────────────────────────────
+  if (q.key === 'techniciens_presents' && !state.responses[q.key] && state.responses.redacteur) {
+    state.responses[q.key] = state.responses.redacteur;
+    console.log('✨ Pré-cochage Q8 avec rédacteur:', state.responses.redacteur);
+  }
 
   TECHNICIENS.forEach(tech => {
     const chip = document.createElement('button');
