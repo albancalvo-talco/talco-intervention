@@ -58,7 +58,7 @@ function updateQuestionDisplay() {
   const chipsZone = document.getElementById('q-chips-zone');
   const isChipsQuestion = (q.type === 'tech-single' || q.type === 'tech-multi');
 
-  if (isChipsQuestion) {
+if (isChipsQuestion) {
     if (_chipsRenderedFor !== q.key) {
       _renderChips(q, chipsZone);
       _chipsRenderedFor = q.key;
@@ -70,6 +70,24 @@ function updateQuestionDisplay() {
     chipsZone.style.display = 'none';
     chipsZone.innerHTML = '';
     _chipsRenderedFor = null;
+  }
+
+  // ── Yes/No (Q13)
+  const yesnoZone = document.getElementById('q-yesno-zone');
+  const isYesnoQuestion = (q.type === 'yesno');
+
+  if (isYesnoQuestion) {
+    if (_yesnoRenderedFor !== q.key) {
+      _renderYesno(q, yesnoZone);
+      _yesnoRenderedFor = q.key;
+    } else {
+      _refreshYesnoSelection(q, yesnoZone);
+    }
+    yesnoZone.style.display = 'flex';
+  } else {
+    yesnoZone.style.display = 'none';
+    yesnoZone.innerHTML = '';
+    _yesnoRenderedFor = null;
   }
 
   // ── Réponse (badge vert si remplie, badge orange si en attente)
