@@ -3,10 +3,14 @@
 // ══════════════════════════════════════════════════════════════
 
 function saveUserSession(user) {
-  localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
-    user,
-    expires: Date.now() + SESSION_TTL
-  }));
+  try {
+    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
+      user,
+      expires: Date.now() + SESSION_TTL
+    }));
+  } catch (e) {
+    console.warn('localStorage indisponible, session non sauvegardée:', e);
+  }
 }
 
 function loadUserSession() {
@@ -25,7 +29,11 @@ function loadUserSession() {
 }
 
 function clearUserSession() {
-  localStorage.removeItem(STORAGE_KEYS.SESSION);
+  try {
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+  } catch (e) {
+    console.warn('localStorage indisponible:', e);
+  }
 }
 
 // Callback Google Identity Services (déclaré globalement pour <div data-callback>)
