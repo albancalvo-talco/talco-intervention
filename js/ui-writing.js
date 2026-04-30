@@ -6,6 +6,22 @@ let _swipeState = {
   startX: 0, startY: 0, dx: 0, isSwiping: false
 };
 
+// Convertit "DD/MM/YYYY" en "YYYY-MM-DD" pour <input type="date">.
+// Retourne null si le format ou la date est invalide.
+function _ddmmyyyyToIso(val) {
+  if (!val || typeof val !== 'string') return null;
+  const parts = val.split('/');
+  if (parts.length !== 3) return null;
+  const [d, m, y] = parts.map(Number);
+  if (!d || !m || !y || isNaN(d) || isNaN(m) || isNaN(y)) return null;
+  if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return null;
+  const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  // Vérifie que la date existe vraiment (ex: 31/02/2025 → invalide)
+  const check = new Date(iso);
+  if (isNaN(check.getTime()) || check.getUTCDate() !== d || check.getUTCMonth() + 1 !== m) return null;
+  return iso;
+}
+
 window.startWritingMode = async function() {
   await unlockAudio();
   document.getElementById('mic-zone').classList.add('started');
@@ -195,8 +211,8 @@ function _appendWritingInput(card, q, val) {
     inp.className = 'wc-input' + (val ? ' filled' : '');
     inp.dataset.key = q.key;
     if (val) {
-      const parts = val.split('/');
-      if (parts.length === 3) inp.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      const iso = _ddmmyyyyToIso(val);
+      if (iso) inp.value = iso;
     }
     inp.addEventListener('change', () => {
       if (inp.value) {
@@ -302,8 +318,8 @@ function syncWritingPanelValues() {
     if (!inp) return;
     if (q.type === 'date') {
       if (val) {
-        const parts = val.split('/');
-        if (parts.length === 3) inp.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        const iso = _ddmmyyyyToIso(val);
+        if (iso) inp.value = iso;
       }
     } else if (q.type === 'time') {
       inp.value = val ? val.replace('h', ':').substring(0, 5) : '';

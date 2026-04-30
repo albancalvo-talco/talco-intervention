@@ -238,6 +238,19 @@ async function submitReport() {
     if (val) state.responses[key] = val;
   });
 
+  // Valider les champs date avant envoi
+  const dateFields = QUESTIONS.filter(q => q.type === 'date').map(q => q.key);
+  const datePattern = /^\d{2}\/\d{2}\/\d{4}$/;
+  for (const key of dateFields) {
+    const val = state.responses[key];
+    if (val && !datePattern.test(val)) {
+      const label = QUESTIONS.find(q => q.key === key)?.label || key;
+      showToast(`Date invalide pour "${label}" — attendu JJ/MM/AAAA`);
+      document.getElementById('modal-preview')?.classList.add('visible');
+      return;
+    }
+  }
+
   document.getElementById('modal-preview')?.classList.remove('visible');
   document.getElementById('loading-text').textContent = 'Envoi du rapport...';
   document.getElementById('loading')?.classList.add('visible');
