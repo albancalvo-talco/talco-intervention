@@ -129,7 +129,7 @@ function _renderChips(q, container) {
   let preCheckedTechs = [];
   if (q.key === 'techniciens_presents' && !state.responses[q.key] && state.responses.redacteur) {
     preCheckedTechs = [state.responses.redacteur];
-    console.log('✨ Pré-cochage visuel Q8 avec rédacteur:', state.responses.redacteur);
+    DEBUG && console.log('✨ Pré-cochage visuel Q8 avec rédacteur:', state.responses.redacteur);
   }
 
   TECHNICIENS.forEach(tech => {
@@ -336,7 +336,14 @@ function showStartButton() {
 
   // Si redacteur déjà auto-rempli → message personnalisé
   if (state.responses.redacteur) {
-    text.innerHTML = `Bonjour <strong style="color:var(--gold)">${escHtml(state.responses.redacteur.split(' ')[0])}</strong> 👋<br>Prêt à commencer le rapport ?`;
+    text.append('Bonjour ');
+    const strong = document.createElement('strong');
+    strong.style.color = 'var(--gold)';
+    strong.textContent = state.responses.redacteur.split(' ')[0];
+    text.appendChild(strong);
+    text.append(' 👋');
+    text.appendChild(document.createElement('br'));
+    text.append('Prêt à commencer le rapport ?');
   } else {
     text.textContent = 'Prêt à commencer les questions ?';
   }

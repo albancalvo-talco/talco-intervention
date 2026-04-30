@@ -8,7 +8,11 @@ function onUserAuthenticated(user) {
 
   const av = document.getElementById('user-avatar');
   if (user.picture) {
-    av.innerHTML = `<img src="${user.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+    const img = document.createElement('img');
+    img.src = user.picture;
+    img.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;';
+    av.textContent = '';
+    av.appendChild(img);
   } else {
     av.textContent = user.initials;
   }

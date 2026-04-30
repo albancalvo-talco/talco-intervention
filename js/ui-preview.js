@@ -55,7 +55,14 @@ function rebuildPhotoGrid() {
   state.photoUrls.forEach((url, i) => {
     const div = document.createElement('div');
     div.className = 'photo-thumb';
-    div.innerHTML = `<img src="${url}"><button class="rm-ph" onclick="removePhoto(${i})">✕</button>`;
+    const img = document.createElement('img');
+    img.src = url;
+    const btn = document.createElement('button');
+    btn.className = 'rm-ph';
+    btn.textContent = '✕';
+    btn.onclick = () => removePhoto(i);
+    div.appendChild(img);
+    div.appendChild(btn);
     grid.appendChild(div);
   });
 
@@ -95,8 +102,16 @@ window.showPreview = function() {
     const val = state.responses[q.key] || '';
     const div = document.createElement('div');
     div.className = 'preview-field';
-    div.innerHTML = `<div class="pf-label">${q.label}</div>
-      <input class="pf-value" data-key="${q.key}" value="${escHtml(val)}" placeholder="Non renseigné">`;
+    const label = document.createElement('div');
+    label.className = 'pf-label';
+    label.textContent = q.label;
+    const inp = document.createElement('input');
+    inp.className = 'pf-value';
+    inp.dataset.key = q.key;
+    inp.value = val;
+    inp.placeholder = 'Non renseigné';
+    div.appendChild(label);
+    div.appendChild(inp);
     body.appendChild(div);
   });
 

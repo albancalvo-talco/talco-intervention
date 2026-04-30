@@ -11,15 +11,58 @@
 // Aucun audio joué pendant la phase __init__ (isInitPhase=true).
 // ══════════════════════════════════════════════════════════════
 
+// ──────────────────────────────────────────────────────────────
+// HELPER — fetch JSON avec retry exponentiel
+//
+// Chaque tentative recrée son propre AbortController (timeout indépendant).
+// Retente sur : erreur réseau (TypeError) + 5xx serveur.
+// Ne retente PAS sur : AbortError (timeout voulu) ni 4xx.
+// Backoff : 1s, 2s entre les tentatives (maxRetries = 2 par défaut).
+// ──────────────────────────────────────────────────────────────
+async function _fetchJSONWithRetry(payload, maxRetries = 2, onRetry) {
+  let lastErr;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      const delay = Math.pow(2, attempt - 1) * 1000;
+      if (onRetry) onRetry(attempt, maxRetries);
+      await new Promise(r => setTimeout(r, delay));
+      showTimeoutBar(CONFIG.TIMEOUT_MS);
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
+    try {
+      const resp = await fetch(CONFIG.VOICE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(timer);
+      if (resp.status >= 500 && attempt < maxRetries) {
+        lastErr = new Error('HTTP ' + resp.status);
+        continue;
+      }
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return await resp.json();
+    } catch (e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw e;
+      lastErr = e;
+      if (attempt === maxRetries) throw lastErr;
+    }
+  }
+  throw lastErr;
+}
+
 async function sendToAgent(audioBase64, textInput) {
   if (state.phase === 'sending') {
-    console.warn('⚠️ sendToAgent déjà en cours');
+    DEBUG && console.warn('⚠️ sendToAgent déjà en cours');
     return;
   }
 
   const now = Date.now();
   if (state.lastSendTime && (now - state.lastSendTime) < 800) {
-    console.warn('⚠️ Appel trop rapide, ignoré');
+    DEBUG && console.warn('⚠️ Appel trop rapide, ignoré');
     return;
   }
   state.lastSendTime = now;
@@ -41,25 +84,16 @@ async function sendToAgent(audioBase64, textInput) {
       history:      state.history,
       responses:    state.responses
     };
+    if (state.idToken) payload.id_token = state.idToken;
     if (audioBase64) payload.audio_base64 = audioBase64;
     if (textInput === '__init__') payload.text_input = '__init__';
     else if (textInput) payload.text_input = textInput;
 
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
-
-    const resp = await fetch(CONFIG.VOICE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal
+    data = await _fetchJSONWithRetry(payload, 2, (attempt, max) => {
+      updateMicStatus(`Réseau instable — tentative ${attempt}/${max}…`);
     });
 
-    clearTimeout(timeout);
     hideTimeoutBar();
-
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    data = await resp.json();
 
     state.history = data.history || state.history;
     state.responses = { ...state.responses, ...(data.responses || {}) };
@@ -69,7 +103,7 @@ async function sendToAgent(audioBase64, textInput) {
 
   } catch (e) {
     hideTimeoutBar();
-    const msg = e.name === 'AbortError' ? 'Timeout' : e.message;
+    const msg = e.name === 'AbortError' ? 'Timeout — serveur trop lent' : 'Réseau indisponible';
     showToast('Erreur : ' + msg);
     updateMicStatus('Erreur — réessaie');
     setPhase('idle');
@@ -110,7 +144,7 @@ async function sendToAgent(audioBase64, textInput) {
 
     // Auto-skip redacteur si déjà rempli via Google
     if (nextField === 'redacteur' && state.responses.redacteur) {
-      console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
+      DEBUG && console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
       nextField = 'techniciens_presents';
     }
 
@@ -137,7 +171,7 @@ async function sendToAgent(audioBase64, textInput) {
 
 async function sendButtonValue(fieldKey, value) {
   if (state.phase === 'sending') {
-    console.warn('⚠️ sendButtonValue déjà en cours');
+    DEBUG && console.warn('⚠️ sendButtonValue déjà en cours');
     return;
   }
 
@@ -162,22 +196,13 @@ async function sendButtonValue(fieldKey, value) {
       action:       'sync',
       text_input:   value
     };
+    if (state.idToken) payload.id_token = state.idToken;
 
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
-
-    const resp = await fetch(CONFIG.VOICE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal
+    data = await _fetchJSONWithRetry(payload, 2, (attempt, max) => {
+      updateMicStatus(`Réseau instable — tentative ${attempt}/${max}…`);
     });
 
-    clearTimeout(timeout);
     hideTimeoutBar();
-
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    data = await resp.json();
 
     state.history = data.history || state.history;
     state.responses = { ...state.responses, ...(data.responses || {}) };
@@ -187,7 +212,7 @@ async function sendButtonValue(fieldKey, value) {
 
   } catch (e) {
     hideTimeoutBar();
-    const msg = e.name === 'AbortError' ? 'Timeout' : e.message;
+    const msg = e.name === 'AbortError' ? 'Timeout — serveur trop lent' : 'Réseau indisponible';
     showToast('Erreur : ' + msg);
     updateMicStatus('Erreur — réessaie');
     setPhase('idle');
@@ -211,7 +236,7 @@ async function sendButtonValue(fieldKey, value) {
 
     // Auto-skip redacteur si déjà rempli via Google
     if (nextField === 'redacteur' && state.responses.redacteur) {
-      console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
+      DEBUG && console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
       nextField = 'techniciens_presents';
     }
 
@@ -238,49 +263,81 @@ async function submitReport() {
     if (val) state.responses[key] = val;
   });
 
+  // Valider les champs date avant envoi
+  const dateFields = QUESTIONS.filter(q => q.type === 'date').map(q => q.key);
+  const datePattern = /^\d{2}\/\d{2}\/\d{4}$/;
+  for (const key of dateFields) {
+    const val = state.responses[key];
+    if (val && !datePattern.test(val)) {
+      const label = QUESTIONS.find(q => q.key === key)?.label || key;
+      showToast(`Date invalide pour "${label}" — attendu JJ/MM/AAAA`);
+      document.getElementById('modal-preview')?.classList.add('visible');
+      return;
+    }
+  }
+
   document.getElementById('modal-preview')?.classList.remove('visible');
   document.getElementById('loading-text').textContent = 'Envoi du rapport...';
   document.getElementById('loading')?.classList.add('visible');
 
-  try {
-    const payload = {
-      session_id:   state.session_id,
-      sender_email: state.user?.email || '',
-      sender_name:  state.user?.name || '',
-      responses:    state.responses,
-      source:       'voice-agent-v3',
-      action:       'submit_report'
-    };
+  // Retry sur erreur réseau pure uniquement (pas sur 5xx : risque de doublon Google Sheets)
+  const MAX_RETRIES = 2;
+  let lastErr = null;
 
-    let resp;
-    if (state.photoFiles.length === 0) {
-      resp = await fetch(CONFIG.VOICE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    } else {
-      const fd = new FormData();
-      fd.append('data', JSON.stringify(payload));
-      state.photoFiles.forEach((f, i) => fd.append(`photo_${i + 1}`, f, f.name));
-      resp = await fetch(CONFIG.VOICE_URL, { method: 'POST', body: fd });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delay = Math.pow(2, attempt - 1) * 1000;
+      document.getElementById('loading-text').textContent =
+        `Réseau instable — tentative ${attempt}/${MAX_RETRIES}…`;
+      await new Promise(r => setTimeout(r, delay));
     }
 
-    document.getElementById('loading')?.classList.remove('visible');
+    try {
+      const payload = {
+        session_id:   state.session_id,
+        sender_email: state.user?.email || '',
+        sender_name:  state.user?.name || '',
+        responses:    state.responses,
+        source:       'voice-agent-v3',
+        action:       'submit_report'
+      };
+      if (state.idToken) payload.id_token = state.idToken;
 
-    if (!resp.ok) {
-      console.warn('HTTP error:', resp.status);
-      showToast('Attention : erreur serveur, mais le rapport peut avoir été reçu');
+      let resp;
+      if (state.photoFiles.length === 0) {
+        resp = await fetch(CONFIG.VOICE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        const fd = new FormData();
+        fd.append('data', JSON.stringify(payload));
+        state.photoFiles.forEach((f, i) => fd.append(`photo_${i + 1}`, f, f.name));
+        resp = await fetch(CONFIG.VOICE_URL, { method: 'POST', body: fd });
+      }
+
+      document.getElementById('loading')?.classList.remove('visible');
+
+      if (!resp.ok) {
+        console.warn('HTTP error:', resp.status);
+        showToast('Attention : erreur serveur, mais le rapport peut avoir été reçu');
+      }
+
+      showConfirmation();
+      return;
+
+    } catch (e) {
+      lastErr = e;
+      if (e.name !== 'TypeError') break; // ne pas retenter si ce n'est pas une erreur réseau
     }
-
-    showConfirmation();
-
-  } catch (e) {
-    console.error('Erreur envoi rapport:', e);
-    document.getElementById('loading')?.classList.remove('visible');
-    showToast('Erreur réseau : ' + e.message);
-    showConfirmation();
   }
+
+  // Toutes les tentatives ont échoué
+  console.error('Erreur envoi rapport:', lastErr);
+  document.getElementById('loading')?.classList.remove('visible');
+  showToast('Erreur réseau : ' + lastErr?.message);
+  showConfirmation();
 }
 
 window.submitReport = submitReport;

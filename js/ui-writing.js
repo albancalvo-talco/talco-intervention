@@ -6,6 +6,35 @@ let _swipeState = {
   startX: 0, startY: 0, dx: 0, isSwiping: false
 };
 
+// Convertit "DD/MM/YYYY" en "YYYY-MM-DD" pour <input type="date">.
+// Retourne null si le format ou la date est invalide.
+function _ddmmyyyyToIso(val) {
+  if (!val || typeof val !== 'string') return null;
+  const parts = val.split('/');
+  if (parts.length !== 3) return null;
+  const [d, m, y] = parts.map(Number);
+  if (!d || !m || !y || isNaN(d) || isNaN(m) || isNaN(y)) return null;
+  if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return null;
+  const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  // Vérifie que la date existe vraiment (ex: 31/02/2025 → invalide)
+  const check = new Date(iso);
+  if (isNaN(check.getTime()) || check.getUTCDate() !== d || check.getUTCMonth() + 1 !== m) return null;
+  return iso;
+}
+
+// Convertit une valeur heure en "HH:MM" pour <input type="time">.
+// Accepte : "9:30:00", "09:30", "9h30", "9h" — retourne null si invalide.
+function _toTimeInputValue(val) {
+  if (!val || typeof val !== 'string') return null;
+  const s = val.trim().replace('h', ':');
+  const match = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 window.startWritingMode = async function() {
   await unlockAudio();
   document.getElementById('mic-zone').classList.add('started');
@@ -195,8 +224,8 @@ function _appendWritingInput(card, q, val) {
     inp.className = 'wc-input' + (val ? ' filled' : '');
     inp.dataset.key = q.key;
     if (val) {
-      const parts = val.split('/');
-      if (parts.length === 3) inp.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      const iso = _ddmmyyyyToIso(val);
+      if (iso) inp.value = iso;
     }
     inp.addEventListener('change', () => {
       if (inp.value) {
@@ -219,7 +248,7 @@ function _appendWritingInput(card, q, val) {
     inp.type = 'time';
     inp.className = 'wc-input' + (val ? ' filled' : '');
     inp.dataset.key = q.key;
-    if (val) inp.value = val.replace('h', ':').substring(0, 5);
+    if (val) inp.value = _toTimeInputValue(val) ?? '';
     inp.addEventListener('change', () => {
       if (inp.value) state.responses[q.key] = inp.value;
       else delete state.responses[q.key];
@@ -302,11 +331,11 @@ function syncWritingPanelValues() {
     if (!inp) return;
     if (q.type === 'date') {
       if (val) {
-        const parts = val.split('/');
-        if (parts.length === 3) inp.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        const iso = _ddmmyyyyToIso(val);
+        if (iso) inp.value = iso;
       }
     } else if (q.type === 'time') {
-      inp.value = val ? val.replace('h', ':').substring(0, 5) : '';
+      inp.value = val ? (_toTimeInputValue(val) ?? '') : '';
     } else {
       inp.value = val;
     }

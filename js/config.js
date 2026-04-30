@@ -69,3 +69,5 @@ const STORAGE_KEYS = {
 };
 
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours
+
+const DEBUG = false;
