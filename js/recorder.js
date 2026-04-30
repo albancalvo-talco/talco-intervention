@@ -42,7 +42,7 @@ async function _handlePTTStart(e) {
   }
 
   if (state.phase !== 'idle') {
-    console.log('⛔ PTT bloqué (phase:', state.phase, ')');
+    DEBUG && console.log('⛔ PTT bloqué (phase:', state.phase, ')');
     return;
   }
 
@@ -74,7 +74,7 @@ async function startRecording() {
   // → on bloque dès le départ pour ne même pas ouvrir le micro
   const currentQ = QUESTIONS[state.currentQuestionIndex];
   if (currentQ && (currentQ.type === 'tech-single' || currentQ.type === 'tech-multi' || currentQ.type === 'yesno')) {
-    console.log('⚠️ Question avec boutons — micro bloqué');
+    DEBUG && console.log('⚠️ Question avec boutons — micro bloqué');
     showToast('Utilise les boutons pour choisir');
     updateMicStatus('Utilise les boutons ci-dessus');
     _pttActive = false;
@@ -111,7 +111,7 @@ async function startRecording() {
 
       // Bloquer si déjà en envoi (race condition)
       if (state.phase === 'sending') {
-        console.warn('⚠️ Envoi déjà en cours, audio ignoré');
+        DEBUG && console.warn('⚠️ Envoi déjà en cours, audio ignoré');
         return;
       }
 

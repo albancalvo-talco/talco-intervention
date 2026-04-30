@@ -129,7 +129,7 @@ function _renderChips(q, container) {
   let preCheckedTechs = [];
   if (q.key === 'techniciens_presents' && !state.responses[q.key] && state.responses.redacteur) {
     preCheckedTechs = [state.responses.redacteur];
-    console.log('✨ Pré-cochage visuel Q8 avec rédacteur:', state.responses.redacteur);
+    DEBUG && console.log('✨ Pré-cochage visuel Q8 avec rédacteur:', state.responses.redacteur);
   }
 
   TECHNICIENS.forEach(tech => {

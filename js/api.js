@@ -13,13 +13,13 @@
 
 async function sendToAgent(audioBase64, textInput) {
   if (state.phase === 'sending') {
-    console.warn('⚠️ sendToAgent déjà en cours');
+    DEBUG && console.warn('⚠️ sendToAgent déjà en cours');
     return;
   }
 
   const now = Date.now();
   if (state.lastSendTime && (now - state.lastSendTime) < 800) {
-    console.warn('⚠️ Appel trop rapide, ignoré');
+    DEBUG && console.warn('⚠️ Appel trop rapide, ignoré');
     return;
   }
   state.lastSendTime = now;
@@ -110,7 +110,7 @@ async function sendToAgent(audioBase64, textInput) {
 
     // Auto-skip redacteur si déjà rempli via Google
     if (nextField === 'redacteur' && state.responses.redacteur) {
-      console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
+      DEBUG && console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
       nextField = 'techniciens_presents';
     }
 
@@ -137,7 +137,7 @@ async function sendToAgent(audioBase64, textInput) {
 
 async function sendButtonValue(fieldKey, value) {
   if (state.phase === 'sending') {
-    console.warn('⚠️ sendButtonValue déjà en cours');
+    DEBUG && console.warn('⚠️ sendButtonValue déjà en cours');
     return;
   }
 
@@ -211,7 +211,7 @@ async function sendButtonValue(fieldKey, value) {
 
     // Auto-skip redacteur si déjà rempli via Google
     if (nextField === 'redacteur' && state.responses.redacteur) {
-      console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
+      DEBUG && console.log('⏭️ Auto-skip redacteur (déjà rempli via Google)');
       nextField = 'techniciens_presents';
     }
 

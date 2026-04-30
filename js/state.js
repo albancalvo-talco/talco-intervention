@@ -59,7 +59,7 @@ const state = {
 function setPhase(newPhase) {
   const old = state.phase;
   if (old === newPhase) return;
-  console.log(`📍 Phase : ${old} → ${newPhase}`);
+  DEBUG && console.log(`📍 Phase : ${old} → ${newPhase}`);
   state.phase = newPhase;
   // Notifier l'UI
   if (typeof onPhaseChange === 'function') onPhaseChange(newPhase, old);
@@ -146,10 +146,10 @@ function autofillFromGoogle() {
   if (!state.user || !state.user.name) return;
   const matched = matchTechnicien(state.user.name);
   if (!matched) {
-    console.log('🔍 Aucun match technicien pour:', state.user.name);
+    DEBUG && console.log('🔍 Aucun match technicien pour:', state.user.name);
     return;
   }
-  console.log('✅ Match technicien Google:', state.user.name, '→', matched);
+  DEBUG && console.log('✅ Match technicien Google:', state.user.name, '→', matched);
   state.responses.redacteur = matched;
   // PAS de pré-remplissage de techniciens_presents : on veut que Q8 soit posée,
   // avec ce nom déjà coché en pré-sélection (cf. _renderChips).

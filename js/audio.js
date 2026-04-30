@@ -51,7 +51,7 @@ async function playLocalAudio(fieldKey) {
   stopCurrentAudio();
 
   const url = `${CONFIG.AUDIO_BASE_PATH}/${state.selectedVoice}/${fieldKey}.mp3`;
-  console.log('🔊 playLocalAudio:', fieldKey, '→', url);
+  DEBUG && console.log('🔊 playLocalAudio:', fieldKey, '→', url);
 
   return new Promise(resolve => {
     const audio = new Audio(url);
