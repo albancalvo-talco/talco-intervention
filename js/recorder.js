@@ -12,6 +12,8 @@
 // ══════════════════════════════════════════════════════════════
 
 let _pttActive = false;
+let _currentStream = null;
+let _releaseTimer = null;
 
 function setupPTT() {
   const btn = document.getElementById('walkie-btn');
@@ -83,6 +85,7 @@ async function startRecording() {
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    _currentStream = stream;
     state.audioChunks = [];
 
     let mimeType = 'audio/webm';
@@ -162,15 +165,15 @@ function updateMicStatus(msg) {
 
 // Libère le micro quand l'app passe en arrière-plan (iOS garde l'icône active sinon)
 function _releaseMediaStream() {
+  _releaseTimer = null;
   if (state.mediaRecorder && state.phase === 'recording') {
     try { state.mediaRecorder.stop(); } catch (e) {}
   }
-  if (state.mediaRecorder) {
-    try {
-      state.mediaRecorder.stream?.getTracks().forEach(t => t.stop());
-    } catch (e) {}
-    state.mediaRecorder = null;
+  if (_currentStream) {
+    try { _currentStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    _currentStream = null;
   }
+  state.mediaRecorder = null;
   _pttActive = false;
   if (state.phase === 'recording') {
     setPhase('idle');
@@ -179,7 +182,14 @@ function _releaseMediaStream() {
   }
 }
 
+// Debounce d'1s pour ignorer les dialogs système iOS (permission micro)
+// qui déclenchent brièvement visibilitychange hidden/visible
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') _releaseMediaStream();
+  if (document.visibilityState === 'hidden') {
+    _releaseTimer = setTimeout(_releaseMediaStream, 1000);
+  } else {
+    clearTimeout(_releaseTimer);
+    _releaseTimer = null;
+  }
 });
 window.addEventListener('pagehide', _releaseMediaStream);
