@@ -84,6 +84,7 @@ async function sendToAgent(audioBase64, textInput) {
       history:      state.history,
       responses:    state.responses
     };
+    if (state.idToken) payload.id_token = state.idToken;
     if (audioBase64) payload.audio_base64 = audioBase64;
     if (textInput === '__init__') payload.text_input = '__init__';
     else if (textInput) payload.text_input = textInput;
@@ -195,6 +196,7 @@ async function sendButtonValue(fieldKey, value) {
       action:       'sync',
       text_input:   value
     };
+    if (state.idToken) payload.id_token = state.idToken;
 
     data = await _fetchJSONWithRetry(payload, 2, (attempt, max) => {
       updateMicStatus(`Réseau instable — tentative ${attempt}/${max}…`);
@@ -299,6 +301,7 @@ async function submitReport() {
         source:       'voice-agent-v3',
         action:       'submit_report'
       };
+      if (state.idToken) payload.id_token = state.idToken;
 
       let resp;
       if (state.photoFiles.length === 0) {

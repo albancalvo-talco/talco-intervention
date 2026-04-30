@@ -43,6 +43,12 @@ window.handleGoogleCredential = function(response) {
     const email = payload.email || '';
     const name = payload.name || email.split('@')[0];
 
+    // Vérifier que le token n'est pas expiré (tolérance 5 min pour le décalage horaire)
+    if (payload.exp && (payload.exp * 1000) < (Date.now() - 5 * 60 * 1000)) {
+      showToast('Token expiré — reconnecte-toi');
+      return;
+    }
+
     if (!email.endsWith('@' + CONFIG.ALLOWED_DOMAIN)) {
       const err = document.getElementById('login-error');
       if (err) err.style.display = 'block';
@@ -54,6 +60,10 @@ window.handleGoogleCredential = function(response) {
 
     const initials = name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
     const user = { email, name, initials, picture: payload.picture || null };
+
+    // Stocker le JWT brut en mémoire uniquement (pas localStorage)
+    // → transmis à n8n pour vérification cryptographique côté serveur
+    state.idToken = response.credential;
 
     saveUserSession(user);
     onUserAuthenticated(user);

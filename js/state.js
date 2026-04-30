@@ -16,6 +16,7 @@
 const state = {
   // Auth
   user: null,
+  idToken: null, // JWT Google brut — mémoire uniquement, jamais persisté
 
   // Session
   session_id: null,
