@@ -67,14 +67,24 @@ function rebuildPhotoGrid() {
   });
 
   if (state.photoFiles.length < 5) {
-    const add = document.createElement('label');
-    add.className = 'photo-add-label';
-    add.setAttribute('for', 'file-input');
-    add.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    const addCamera = document.createElement('label');
+    addCamera.className = 'photo-add-label';
+    addCamera.setAttribute('for', 'file-input-camera');
+    addCamera.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
       <circle cx="12" cy="13" r="4"/>
-    </svg><span>Photo</span>`;
-    grid.appendChild(add);
+    </svg><span>Caméra</span>`;
+    grid.appendChild(addCamera);
+
+    const addGallery = document.createElement('label');
+    addGallery.className = 'photo-add-label';
+    addGallery.setAttribute('for', 'file-input-gallery');
+    addGallery.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+      <circle cx="8.5" cy="8.5" r="1.5"/>
+      <polyline points="21 15 16 10 5 21"/>
+    </svg><span>Pellicule</span>`;
+    grid.appendChild(addGallery);
   }
 
   const c = document.getElementById('photo-counter');
@@ -153,6 +163,7 @@ window.showConfirmation = function() {
   showScreen('confirmation');
 };
 
-window.nouveauRapport = function() {
+window.nouveauRapport = async function() {
   startSession();
+  await startReport();
 };

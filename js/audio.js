@@ -33,6 +33,14 @@ async function unlockAudio() {
   }
 }
 
+// iOS suspend l'AudioContext quand l'app passe en arrière-plan.
+// On remet audioUnlocked à false pour forcer un re-unlock à la prochaine interaction.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && _audioContext?.state === 'suspended') {
+    state.audioUnlocked = false;
+  }
+});
+
 // Stoppe tout audio en cours (sans erreur)
 function stopCurrentAudio() {
   if (state.currentAudio) {

@@ -140,6 +140,14 @@
             </svg>
             Rapport Écrit
           </button>
+          <button class="btn-pointage" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Pointage
+            <span class="btn-pointage-badge">En développement</span>
+          </button>
         </div>
       </div>
 
@@ -226,11 +234,13 @@
   <div class="confirm-title">Rapport envoyé !</div>
   <div class="confirm-recap" id="confirm-recap"></div>
   <button class="btn-nouveau" onclick="nouveauRapport()">+ Nouveau rapport</button>
+  <button class="btn-quitter" onclick="quitterSession()">Quitter</button>
 </div>
 
 <!-- Toast + loading + input photos -->
 <div class="toast" id="toast"></div>
-<input type="file" id="file-input" accept="image/*" capture="environment" multiple style="display:none" onchange="handlePhotoInput(this)">
+<input type="file" id="file-input-camera" accept="image/*" capture="environment" multiple style="display:none" onchange="handlePhotoInput(this)">
+<input type="file" id="file-input-gallery" accept="image/*" multiple style="display:none" onchange="handlePhotoInput(this)">
 <div class="loading-overlay" id="loading">
   <div class="spinner"></div>
   <div class="loading-text" id="loading-text">Envoi...</div>
