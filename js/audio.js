@@ -11,14 +11,17 @@ let _audioContext = null;
 
 // Débloque l'audio (iOS Safari exige une interaction user pour démarrer)
 async function unlockAudio() {
-  if (state.audioUnlocked) return true;
   try {
     if (!_audioContext) {
       _audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
+    // Toujours tenter de reprendre si suspendu, même si déjà "unlocked"
+    // (après enregistrement micro, iOS coupe la session audio de lecture)
     if (_audioContext.state === 'suspended') {
       await _audioContext.resume();
+      state.audioUnlocked = false; // force le re-ping ci-dessous
     }
+    if (state.audioUnlocked) return true;
     // Ping silencieux pour valider l'unlock iOS
     const buffer = _audioContext.createBuffer(1, 1, 22050);
     const source = _audioContext.createBufferSource();
@@ -57,6 +60,8 @@ function stopCurrentAudio() {
 async function playLocalAudio(fieldKey) {
   // Toujours stopper le précédent
   stopCurrentAudio();
+  // Re-unlock systématique : après un enregistrement micro iOS suspend la session audio
+  await unlockAudio();
 
   const url = `${CONFIG.AUDIO_BASE_PATH}/${state.selectedVoice}/${fieldKey}.mp3`;
   DEBUG && console.log('🔊 playLocalAudio:', fieldKey, '→', url);
