@@ -86,6 +86,8 @@ async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     _currentStream = stream;
+    // Le micro prend la main sur la session audio iOS → forcer re-unlock à la prochaine lecture
+    state.audioUnlocked = false;
     state.audioChunks = [];
 
     let mimeType = 'audio/webm';
