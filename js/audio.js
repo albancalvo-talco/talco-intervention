@@ -4,10 +4,15 @@
 //
 // Règle d'or : UN SEUL AUDIO À LA FOIS.
 // Tout audio en cours est stoppé avant d'en jouer un nouveau.
-// Cela évite les boucles / chevauchements observés avant.
+//
+// Lecture via Web Audio API (decodeAudioData + BufferSource) et
+// non via new Audio() : le AudioContext reste actif après un
+// enregistrement micro, contrairement à la session AVAudio iOS
+// qui change de catégorie (Record → Playback) de façon asynchrone.
 // ══════════════════════════════════════════════════════════════
 
 let _audioContext = null;
+let _currentSource = null; // BufferSource en cours de lecture
 
 // Débloque l'audio (iOS Safari exige une interaction user pour démarrer)
 async function unlockAudio() {
@@ -15,29 +20,26 @@ async function unlockAudio() {
     if (!_audioContext) {
       _audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
-    // Toujours tenter de reprendre si suspendu, même si déjà "unlocked"
-    // (après enregistrement micro, iOS coupe la session audio de lecture)
     if (_audioContext.state === 'suspended') {
       await _audioContext.resume();
-      state.audioUnlocked = false; // force le re-ping ci-dessous
+      state.audioUnlocked = false;
     }
     if (state.audioUnlocked) return true;
     // Ping silencieux pour valider l'unlock iOS
-    const buffer = _audioContext.createBuffer(1, 1, 22050);
-    const source = _audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(_audioContext.destination);
-    source.start(0);
+    const buf = _audioContext.createBuffer(1, 1, 22050);
+    const src = _audioContext.createBufferSource();
+    src.buffer = buf;
+    src.connect(_audioContext.destination);
+    src.start(0);
     state.audioUnlocked = true;
     return true;
   } catch (e) {
-    state.audioUnlocked = true; // ne pas bloquer
+    state.audioUnlocked = true;
     return true;
   }
 }
 
 // iOS suspend l'AudioContext quand l'app passe en arrière-plan.
-// On remet audioUnlocked à false pour forcer un re-unlock à la prochaine interaction.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && _audioContext?.state === 'suspended') {
     state.audioUnlocked = false;
@@ -46,55 +48,53 @@ document.addEventListener('visibilitychange', () => {
 
 // Stoppe tout audio en cours (sans erreur)
 function stopCurrentAudio() {
+  if (_currentSource) {
+    try { _currentSource.stop(); } catch (e) {}
+    _currentSource = null;
+  }
+  // Legacy : au cas où state.currentAudio serait encore référencé ailleurs
   if (state.currentAudio) {
-    try {
-      state.currentAudio.pause();
-      state.currentAudio.src = ''; // libère la ressource
-    } catch (e) {}
+    try { state.currentAudio.pause(); state.currentAudio.src = ''; } catch (e) {}
     state.currentAudio = null;
   }
 }
 
-// Joue un audio local pour un champ donné
-// Retourne une Promise qui se résout à la fin de la lecture (ou en cas d'erreur)
+// Joue un audio local via Web Audio API.
+// Retourne une Promise qui se résout à la fin de la lecture (ou en cas d'erreur).
 async function playLocalAudio(fieldKey) {
-  // Toujours stopper le précédent
   stopCurrentAudio();
-  // Re-unlock systématique : après un enregistrement micro iOS suspend la session audio
   await unlockAudio();
 
   const url = `${CONFIG.AUDIO_BASE_PATH}/${state.selectedVoice}/${fieldKey}.mp3`;
   DEBUG && console.log('🔊 playLocalAudio:', fieldKey, '→', url);
 
-  return new Promise(resolve => {
-    const audio = new Audio(url);
-    state.currentAudio = audio;
-    setPhase('speaking');
+  setPhase('speaking');
 
-    let resolved = false;
-    const cleanup = () => {
-      if (resolved) return;
-      resolved = true;
-      // Si c'est encore l'audio courant, on remet à null
-      if (state.currentAudio === audio) {
-        state.currentAudio = null;
-        // Retour idle uniquement si on est encore en speaking
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const arrayBuffer = await resp.arrayBuffer();
+    const audioBuffer = await _audioContext.decodeAudioData(arrayBuffer);
+
+    await new Promise(resolve => {
+      const source = _audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(_audioContext.destination);
+      _currentSource = source;
+
+      source.onended = () => {
+        if (_currentSource === source) _currentSource = null;
         if (state.phase === 'speaking') setPhase('idle');
-      }
-      resolve();
-    };
+        resolve();
+      };
 
-    audio.onended = cleanup;
-    audio.onerror = (e) => {
-      console.warn('❌ Audio non trouvé:', url, e);
-      cleanup();
-    };
-
-    audio.play().catch(err => {
-      console.warn('❌ play() échec:', err);
-      cleanup();
+      source.start(0);
     });
-  });
+  } catch (e) {
+    console.warn('❌ Audio erreur:', fieldKey, e);
+    _currentSource = null;
+    if (state.phase === 'speaking') setPhase('idle');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
