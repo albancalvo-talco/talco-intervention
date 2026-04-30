@@ -22,6 +22,19 @@ function _ddmmyyyyToIso(val) {
   return iso;
 }
 
+// Convertit une valeur heure en "HH:MM" pour <input type="time">.
+// Accepte : "9:30:00", "09:30", "9h30", "9h" — retourne null si invalide.
+function _toTimeInputValue(val) {
+  if (!val || typeof val !== 'string') return null;
+  const s = val.trim().replace('h', ':');
+  const match = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 window.startWritingMode = async function() {
   await unlockAudio();
   document.getElementById('mic-zone').classList.add('started');
@@ -235,7 +248,7 @@ function _appendWritingInput(card, q, val) {
     inp.type = 'time';
     inp.className = 'wc-input' + (val ? ' filled' : '');
     inp.dataset.key = q.key;
-    if (val) inp.value = val.replace('h', ':').substring(0, 5);
+    if (val) inp.value = _toTimeInputValue(val) ?? '';
     inp.addEventListener('change', () => {
       if (inp.value) state.responses[q.key] = inp.value;
       else delete state.responses[q.key];
@@ -322,7 +335,7 @@ function syncWritingPanelValues() {
         if (iso) inp.value = iso;
       }
     } else if (q.type === 'time') {
-      inp.value = val ? val.replace('h', ':').substring(0, 5) : '';
+      inp.value = val ? (_toTimeInputValue(val) ?? '') : '';
     } else {
       inp.value = val;
     }
