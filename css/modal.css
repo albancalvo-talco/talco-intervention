@@ -240,6 +240,17 @@
   font-weight: 700;
   cursor: pointer;
 }
+.btn-quitter {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border);
+  padding: 12px 28px;
+  border-radius: 100px;
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
 
 /* ── Toast ── */
 .toast {

@@ -153,6 +153,7 @@ window.showConfirmation = function() {
   showScreen('confirmation');
 };
 
-window.nouveauRapport = function() {
+window.nouveauRapport = async function() {
   startSession();
+  await startReport();
 };

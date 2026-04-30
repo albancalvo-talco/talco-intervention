@@ -56,6 +56,9 @@ function startSession() {
 
 window.newSession = function() { startSession(); };
 
+// Retour à la page de choix (Audio / Écrit) sans démarrer
+window.quitterSession = function() { startSession(); };
+
 // ══════════════════════════════════════════════════════════════
 // DÉMARRAGE DU RAPPORT
 // ══════════════════════════════════════════════════════════════
