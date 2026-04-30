@@ -239,7 +239,8 @@
 
 <!-- Toast + loading + input photos -->
 <div class="toast" id="toast"></div>
-<input type="file" id="file-input" accept="image/*" capture="environment" multiple style="display:none" onchange="handlePhotoInput(this)">
+<input type="file" id="file-input-camera" accept="image/*" capture="environment" multiple style="display:none" onchange="handlePhotoInput(this)">
+<input type="file" id="file-input-gallery" accept="image/*" multiple style="display:none" onchange="handlePhotoInput(this)">
 <div class="loading-overlay" id="loading">
   <div class="spinner"></div>
   <div class="loading-text" id="loading-text">Envoi...</div>

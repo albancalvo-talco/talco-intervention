@@ -159,3 +159,27 @@ function updateMicStatus(msg) {
   const el = document.getElementById('mic-status');
   if (el) el.textContent = msg;
 }
+
+// Libère le micro quand l'app passe en arrière-plan (iOS garde l'icône active sinon)
+function _releaseMediaStream() {
+  if (state.mediaRecorder && state.phase === 'recording') {
+    try { state.mediaRecorder.stop(); } catch (e) {}
+  }
+  if (state.mediaRecorder) {
+    try {
+      state.mediaRecorder.stream?.getTracks().forEach(t => t.stop());
+    } catch (e) {}
+    state.mediaRecorder = null;
+  }
+  _pttActive = false;
+  if (state.phase === 'recording') {
+    setPhase('idle');
+    updateMicStatus('Maintiens pour parler');
+    document.getElementById('walkie-btn')?.classList.remove('listening', 'processing');
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') _releaseMediaStream();
+});
+window.addEventListener('pagehide', _releaseMediaStream);
